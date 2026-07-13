@@ -69,13 +69,13 @@ impl<'a> MarkdownConfig<'a> {
         Self::new(&Styles::DARK)
     }
 
-    /// Creates a new `MarkdownConfig` with bright theme styling.
+    /// Creates a new `MarkdownConfig` with light theme styling.
     ///
     /// # Returns
-    /// A `MarkdownConfig` instance configured for bright backgrounds
+    /// A `MarkdownConfig` instance configured for light backgrounds
     #[must_use]
-    pub fn bright() -> Self {
-        Self::new(&Styles::BRIGHT)
+    pub fn light() -> Self {
+        Self::new(&Styles::LIGHT)
     }
 
     #[allow(clippy::too_many_lines)]
@@ -300,7 +300,7 @@ impl Styles {
         quote_with_marker_background_style: |s| s.with_background(Color::Custom8(235)),
     };
 
-    const BRIGHT: Styles = Styles {
+    const LIGHT: Styles = Styles {
         title_style: |s| {
             s.with_foreground(Color::Custom8(33))
                 .with_effect(Effect::Bold)

@@ -1,4 +1,5 @@
 //! Shared utilities for examples
+#![allow(dead_code)]
 
 use std::io::Write;
 use std::sync::Mutex;
@@ -28,13 +29,13 @@ pub(crate) struct Menu {
 }
 
 impl Menu {
-    pub fn new(items: &[MenuItem]) -> Self {
+    pub(crate) fn new(items: &[MenuItem]) -> Self {
         Self {
             items: items.to_vec(),
         }
     }
 
-    pub fn show_and_handle_menu(&self) {
+    pub(crate) fn show_and_handle_menu(&self) {
         loop {
             self.show();
             match self.select() {
@@ -48,7 +49,8 @@ impl Menu {
         }
     }
 
-    fn show_error(message: &str) {
+    pub(crate) fn show_error<T>(message: T)
+    where T: AsRef<str> {
         let mut error = TextBuilder::new();
         error.push_style(
             Style::default()
@@ -74,7 +76,7 @@ impl Menu {
 
         let cols = get_output_width();
         let formatted = menu.layout(cols);
-        print!("{}", formatted);
+        print!("{formatted}");
     }
 
     fn select(&self) -> Option<MenuItem> {
@@ -87,7 +89,7 @@ impl Menu {
             self.items
                 .iter()
                 .find(|a| a.item.key == ch)
-                .map(|action| action.clone())
+                .cloned()
         } else {
             None
         }
@@ -98,7 +100,7 @@ impl Menu {
         std::io::stdout().flush().unwrap();
         let mut response = String::new();
         std::io::stdin().read_line(&mut response).unwrap();
-        response
+        response.trim_end().to_string()
     }
 }
 
@@ -119,7 +121,7 @@ impl MenuItem {
         }
     }
 
-    pub fn quit() -> MenuItem {
+    pub(crate) fn quit() -> MenuItem {
         MenuItem::new('q', "Quit the example", || std::process::exit(0))
     }
 
@@ -127,7 +129,7 @@ impl MenuItem {
         MenuItem::new('b', "Go back to example", || true)
     }
 
-    pub fn options() -> MenuItem {
+    pub(crate) fn options() -> MenuItem {
         MenuItem::new('o', "Change the layout width", || {
             let menu = Menu::new(&[
                 MenuItem::use_terminal_width(),
@@ -143,15 +145,12 @@ impl MenuItem {
     pub(crate) fn use_fixed_width() -> MenuItem {
         MenuItem::new('f', "Set fixed output width", || {
             let width = Menu::prompt("Enter the new output width");
-            match width.trim().parse() {
-                Ok(w) => {
-                    *WIDTH.lock().unwrap() = w;
-                    true
-                }
-                Err(_) => {
-                    Menu::show_error("Invalid input.");
-                    false
-                }
+            if let Ok(w) = width.trim().parse() {
+                *WIDTH.lock().unwrap() = w;
+                true
+            } else {
+                Menu::show_error("Invalid input.");
+                false
             }
         })
     }

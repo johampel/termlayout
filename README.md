@@ -177,11 +177,20 @@ See `examples/two_columns.rs` for a complete custom widget implementation.
 The repository includes several examples demonstrating different features:
 
 ```bash
-# Table with multiple widgets
-cargo run --example table_example
+# Interactive dashboard: grid/split layouts, frames, lists, tables, and styling
+cargo run --example dashboard
+
+# Newspaper-style layout showcasing wrapping and alignment modes
+cargo run --example newspaper
 
 # Custom two-column layout widget
 cargo run --example two_columns
+
+# Interactive directory tree using the Tree widget
+cargo run --example directory_tree
+
+# Interactive Markdown viewer (requires the `markdown` feature)
+cargo run --example markdown_viewer --features markdown
 ```
 
 ## Development

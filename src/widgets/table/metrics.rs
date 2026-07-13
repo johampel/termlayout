@@ -2,6 +2,7 @@ use crate::widgets::table::decoration::DecoratedTable;
 use crate::widgets::{Cell, CellDimension, CellWidth, Row, TableColumn};
 use crate::{Dimension, WrapMode};
 use std::cmp::max;
+use std::collections::VecDeque;
 
 /// Metrics for a table, including widths and heights of cells and rows.
 ///
@@ -43,9 +44,9 @@ impl<'a> TableMetrics<'a> {
         let mut len = 0;
         let mut all_rows = (0..self.table.rows)
             .map(|row| self.row(row, max_width, wrap_mode))
-            .fold(vec![], |mut acc, row| {
+            .fold(VecDeque::new(), |mut acc, row| {
                 len += max(len, row.len());
-                acc.push(row);
+                acc.push_back(row);
                 acc
             });
 

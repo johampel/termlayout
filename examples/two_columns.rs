@@ -1,4 +1,4 @@
-//! Beispiel für ein benutzerdefiniertes Zwei-Spalten-Layout-Widget
+//! Example demonstrating how to author an own [`Layout`] widget.
 
 use std::any::Any;
 use termlayout::ext::{DisplayStr, LayoutWithOptions};
@@ -14,7 +14,9 @@ mod shared;
 /// This example makes use of the [`Horizontal`] and [`Lines`] widget to form a new reusable
 /// widget named `TwoColumns`. `TwoColumns` is a widget that displays its content in two columns.
 struct TwoColumns {
+    /// The content
     content: RcLayout,
+    /// The spacer string between the two columns
     spacer: String,
 }
 

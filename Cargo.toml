@@ -19,7 +19,7 @@ unicode-width = "0.2.0"
 termsize = "0.1.9"
 
 [features]
-default = ["markdown"]
+default = []
 markdown = ["dep:pulldown-cmark"]
 
 [[example]]
