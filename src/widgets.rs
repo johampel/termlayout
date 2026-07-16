@@ -23,6 +23,8 @@ pub(crate) mod paragraph;
 pub(crate) mod table;
 pub(crate) mod tree;
 pub(crate) mod vertical;
+pub(crate) mod key_value_view;
+
 pub use cell::Cell;
 pub use cell::CellAnchor;
 pub use cell::CellDimension;
@@ -55,6 +57,8 @@ pub use tree::TreeNode;
 pub use tree::TreePath;
 pub use tree::decoration::TreeDecoration;
 pub use vertical::Vertical;
+pub use key_value_view::KeyValueView;
+pub use key_value_view::decoration::KeyValueViewDecoration;
 
 #[cfg(feature = "markdown")]
 pub use markdown::FrameConfig;

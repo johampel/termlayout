@@ -1,4 +1,4 @@
-use crate::ext::{DisplayStr, Style, Transition};
+use crate::ext::{Color, DisplayStr, Effect, Style, Transition};
 use std::mem;
 use std::ops::AddAssign;
 
@@ -207,6 +207,111 @@ impl TextBuilder {
     {
         self.push_style_change(change);
         self
+    }
+
+    /// Shortcut for calling `with_style_change` to set the given effect
+    ///
+    /// # Parameters
+    /// - `effect`: The effect to set
+    ///
+    /// # Returns
+    /// The modified `TextBuilder` instance
+    #[must_use]
+    pub fn with_effect(mut self, effect: Effect) -> Self {
+        self.with_style_change(|s| s.with_effect(effect))
+    }
+
+    /// Shortcut for calling `with_style_change` to set the bold effect
+    ///
+    /// # Returns
+    /// The modified `TextBuilder` instance
+    #[must_use]
+    pub fn with_bold(mut self) -> Self {
+        self.with_effect(Effect::Bold)
+    }
+
+    /// Shortcut for calling `with_style_change` to set the italic effect
+    ///
+    /// # Returns
+    /// The modified `TextBuilder` instance
+    #[must_use]
+    pub fn with_italic(mut self) -> Self {
+        self.with_effect(Effect::Italic)
+    }
+
+    /// Shortcut for calling `with_style_change` to set the underline effect
+    ///
+    /// # Returns
+    /// The modified `TextBuilder` instance
+    #[must_use]
+    pub fn with_underline(mut self) -> Self {
+        self.with_effect(Effect::Underline)
+    }
+
+    /// Shortcut for calling `with_style_change` to set foreground color
+    ///
+    /// # Parameters
+    /// - `color`: The foreground color to set
+    ///
+    /// # Returns
+    /// The modified `TextBuilder` instance
+    #[must_use]
+    pub fn with_color(mut self, color: Color) -> Self {
+        self.with_style_change(|s| s.with_foreground(color))
+    }
+
+    /// Shortcut for calling `with_style_change` to set foreground color to red
+    ///
+    /// # Returns
+    /// The modified `TextBuilder` instance
+    #[must_use]
+    pub fn with_red(mut self) -> Self {
+        self.with_color(Color::Red)
+    }
+
+    /// Shortcut for calling `with_style_change` to set foreground color to green
+    ///
+    /// # Returns
+    /// The modified `TextBuilder` instance
+    #[must_use]
+    pub fn with_green(mut self) -> Self {
+        self.with_color(Color::Green)
+    }
+
+    /// Shortcut for calling `with_style_change` to set foreground color to yellow
+    ///
+    /// # Returns
+    /// The modified `TextBuilder` instance
+    #[must_use]
+    pub fn with_yellow(mut self) -> Self {
+        self.with_color(Color::Yellow)
+    }
+
+    /// Shortcut for calling `with_style_change` to set foreground color to blue
+    ///
+    /// # Returns
+    /// The modified `TextBuilder` instance
+    #[must_use]
+    pub fn with_blue(mut self) -> Self {
+        self.with_color(Color::Blue)
+    }
+
+    /// Shortcut for calling `with_style_change` to set foreground color to magenta
+    ///
+    /// # Returns
+    /// The modified `TextBuilder` instance
+    #[must_use]
+    pub fn with_magenta(mut self) -> Self {
+        self.with_color(Color::Magenta)
+    }
+
+    /// Shortcut for calling `with_style_change` to set foreground color to cyan
+    ///
+    /// # Returns
+    /// The modified `TextBuilder` instance
+    #[must_use]
+    pub fn with_cyan(mut self) -> Self {
+        self.with_color(Color::Cyan)
     }
 
     /// Pops the current style from the style stack.
