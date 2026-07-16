@@ -3,7 +3,7 @@ use crate::ext::{
     SizedLayoutResult, StrLayoutResult, Style, TakeBackIterator,
 };
 use crate::ext::{BoxedFormattedLayout, box_formatted_layout, rc_layout};
-use crate::{Dimension, Layout, LayoutOptions, WrapMode};
+use crate::{Dimension, Layout, LayoutContext, LayoutOptions, MeasureMode, Measurements, WrapMode};
 use std::any::Any;
 use std::cmp::max;
 use std::fmt::Write;
@@ -188,6 +188,23 @@ impl Lines {
             content,
         )
     }
+
+    fn lines_dim(&self, max_width: usize, fixed_width: bool, wrap_mode: WrapMode) -> Dimension {
+        if max_width == 0 {
+            return Dimension::empty();
+        }
+
+        let mut dim = self
+            .content
+            .display_lines()
+            .map(|line| self.trimming.apply(line))
+            .map(|line| wrap_mode.dimension_for(max_width, max(1, line.display_len())))
+            .fold(Dimension::empty(), |acc, dim| acc.vertical_union(dim));
+        if fixed_width {
+            dim.width = max_width;
+        }
+        dim
+    }
 }
 
 impl Default for Lines {
@@ -197,24 +214,22 @@ impl Default for Lines {
 }
 
 impl Layout for Lines {
-    fn pref_dim(&self, max_width: usize, wrap_mode: WrapMode) -> Dimension {
-        if max_width == 0 {
-            return Dimension::empty();
+    fn measure(&self, mode: MeasureMode) -> Measurements {
+        match mode {
+            MeasureMode::Min => self.measure(MeasureMode::pref(usize::MAX, WrapMode::Truncate(""))),
+            MeasureMode::Pref {
+                max_width,
+                wrap_mode,
+            } => self.lines_dim(max_width, false, wrap_mode).into(),
+            MeasureMode::FixedWidth { width, wrap_mode } => {
+                self.lines_dim(width, true, wrap_mode).into()
+            }
+            MeasureMode::Exact { dimension, .. } => dimension.into(),
         }
-
-        self.content
-            .display_lines()
-            .map(|line| self.trimming.apply(line))
-            .map(|line| wrap_mode.dimension_for(max_width, max(1, line.display_len())))
-            .fold(Dimension::empty(), |acc, dim| acc.vertical_union(dim))
     }
 
-    fn min_dim(&self) -> Dimension {
-        self.pref_dim(usize::MAX, WrapMode::Truncate(""))
-    }
-
-    fn layout_strict(&'_ self, options: LayoutOptions) -> BoxedFormattedLayout<'_> {
-        FormattedLines::new(self, options).into()
+    fn layout_with_context(&'_ self, context: LayoutContext) -> BoxedFormattedLayout<'_> {
+        FormattedLines::new(&self, context.into()).into()
     }
 
     fn as_any(&self) -> &dyn Any {
@@ -385,43 +400,81 @@ mod tests {
     use crate::{Rect, WrapMode};
 
     #[test]
-    fn lines_pref_dim() {
+    fn lines_measure_pref() {
         // Wrap case
         let lines = Lines::left("abc def\nghi\njklm");
-        assert_eq!(lines.pref_dim(10, WrapMode::Wrap), Dimension::new(7, 3));
-        assert_eq!(lines.pref_dim(5, WrapMode::Wrap), Dimension::new(5, 4));
-        assert_eq!(lines.pref_dim(3, WrapMode::Wrap), Dimension::new(3, 6));
-        assert_eq!(lines.pref_dim(1, WrapMode::Wrap), Dimension::new(1, 14));
-        assert_eq!(lines.pref_dim(0, WrapMode::Wrap), Dimension::empty());
+        assert_eq!(
+            lines.measure(MeasureMode::pref(10, WrapMode::Wrap)).dim,
+            Dimension::new(7, 3)
+        );
+        assert_eq!(
+            lines.measure(MeasureMode::pref(5, WrapMode::Wrap)).dim,
+            Dimension::new(5, 4)
+        );
+        assert_eq!(
+            lines.measure(MeasureMode::pref(3, WrapMode::Wrap)).dim,
+            Dimension::new(3, 6)
+        );
+        assert_eq!(
+            lines.measure(MeasureMode::pref(1, WrapMode::Wrap)).dim,
+            Dimension::new(1, 14)
+        );
+        assert_eq!(
+            lines.measure(MeasureMode::pref(0, WrapMode::Wrap)).dim,
+            Dimension::new(0, 0)
+        );
 
         // Truncate case
         let lines = Lines::left("abc def\nghi\njklm");
         assert_eq!(
-            lines.pref_dim(10, WrapMode::Truncate("...")),
+            lines
+                .measure(MeasureMode::pref(10, WrapMode::Truncate("...")))
+                .dim,
             Dimension::new(7, 3)
         );
         assert_eq!(
-            lines.pref_dim(5, WrapMode::Truncate("...")),
+            lines
+                .measure(MeasureMode::pref(5, WrapMode::Truncate("...")))
+                .dim,
             Dimension::new(5, 3)
         );
         assert_eq!(
-            lines.pref_dim(3, WrapMode::Truncate("...")),
+            lines
+                .measure(MeasureMode::pref(3, WrapMode::Truncate("...")))
+                .dim,
             Dimension::new(3, 3)
         );
         assert_eq!(
-            lines.pref_dim(1, WrapMode::Truncate("...")),
+            lines
+                .measure(MeasureMode::pref(1, WrapMode::Truncate("...")))
+                .dim,
             Dimension::new(1, 3)
         );
         assert_eq!(
-            lines.pref_dim(0, WrapMode::Truncate("...")),
-            Dimension::empty()
+            lines
+                .measure(MeasureMode::pref(0, WrapMode::Truncate("...")))
+                .dim,
+            Dimension::new(0, 0)
         );
     }
 
     #[test]
-    fn lines_min_dim() {
+    fn lines_measure_exact() {
         let lines = Lines::left("abc def\nghi\njklm");
-        assert_eq!(lines.min_dim(), Dimension::new(7, 3));
+        let measurements = lines.measure(MeasureMode::exact(
+            Dimension::new(10, 5),
+            WrapMode::default(),
+        ));
+        assert_eq!(measurements.dim, Dimension::new(10, 5));
+        assert_eq!(measurements.specifics.is_none(), true);
+    }
+
+    #[test]
+    fn lines_measure_min() {
+        let lines = Lines::left("abc def\nghi\njklm");
+        let measurements = lines.measure(MeasureMode::min());
+        assert_eq!(measurements.dim, Dimension::new(7, 3));
+        assert_eq!(measurements.specifics.is_none(), true);
     }
 
     #[test]

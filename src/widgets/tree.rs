@@ -2,7 +2,7 @@ use crate::ext::{DisplayStr, LayoutWithOptions};
 use crate::widgets::TreeDecoration;
 use crate::widgets::tree::formatted::FormattedTreeNode;
 use crate::widgets::vertical::FormattedVertical;
-use crate::{BoxedFormattedLayout, Dimension, Layout, LayoutOptions, RcLayout, Rect, WrapMode};
+use crate::{BoxedFormattedLayout, Dimension, Layout, LayoutContext, LayoutOptions, MeasureMode, Measurements, RcLayout, Rect, WrapMode};
 use std::any::Any;
 use std::cmp::max;
 
@@ -147,6 +147,10 @@ impl Layout for Tree {
         dim
     }
 
+    fn measure(&self, mode: MeasureMode) -> Measurements {
+        todo!()
+    }
+
     fn layout_strict(&'_ self, options: LayoutOptions) -> BoxedFormattedLayout<'_> {
         let mut rows = vec![];
         let mut offset = 0;
@@ -161,6 +165,10 @@ impl Layout for Tree {
         }
 
         FormattedVertical::new(rows, options.with_normalized_horizontal_clip()).into()
+    }
+
+    fn layout_with_context(&'_ self, context: LayoutContext) -> BoxedFormattedLayout<'_> {
+        todo!()
     }
 
     fn as_any(&self) -> &dyn Any {

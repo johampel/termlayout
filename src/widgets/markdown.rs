@@ -3,7 +3,7 @@ pub(crate) mod config;
 mod handler;
 
 use crate::widgets::markdown::handler::Handler;
-use crate::{rc_layout, BoxedFormattedLayout, Dimension, Layout, LayoutOptions, RcLayout, WrapMode};
+use crate::{rc_layout, BoxedFormattedLayout, Dimension, Layout, LayoutOptions, RcLayout, WrapMode, MeasureMode, Measurements, LayoutContext};
 pub use config::FrameConfig;
 pub use config::MarkdownConfig;
 use pulldown_cmark::{Options, Parser};
@@ -123,8 +123,16 @@ impl Layout for Markdown {
         self.inner.min_dim()
     }
 
+    fn measure(&self, mode: MeasureMode) -> Measurements {
+        todo!()
+    }
+
     fn layout_strict(&'_ self, options: LayoutOptions) -> BoxedFormattedLayout<'_> {
         self.inner.layout_strict(options)
+    }
+
+    fn layout_with_context(&'_ self, context: LayoutContext) -> BoxedFormattedLayout<'_> {
+        todo!()
     }
 
     fn as_any(&self) -> &dyn Any {

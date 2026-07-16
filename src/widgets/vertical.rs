@@ -2,7 +2,7 @@ use crate::ext::{
     BaseLayoutWriter, BoxedLayoutWriter, FormattedLayout, LayoutWriter, SizedLayoutResult,
 };
 use crate::ext::{BoxedFormattedLayout, box_formatted_layout, rc_layout};
-use crate::{Dimension, Layout, LayoutOptions, RcLayout, Rect, WrapMode};
+use crate::{Dimension, Layout, LayoutContext, LayoutOptions, MeasureMode, Measurements, RcLayout, Rect, WrapMode};
 use std::any::Any;
 use std::fmt::Write;
 
@@ -77,6 +77,10 @@ impl Layout for Vertical {
         })
     }
 
+    fn measure(&self, mode: MeasureMode) -> Measurements {
+        todo!()
+    }
+
     fn layout_strict(&'_ self, options: LayoutOptions) -> BoxedFormattedLayout<'_> {
         if self.content.len() == 1 {
             return self.content[0].layout_strict(options);
@@ -96,6 +100,10 @@ impl Layout for Vertical {
             formatted.push(layout.layout_strict(layout_opts));
         }
         FormattedVertical::new(formatted, options).into()
+    }
+
+    fn layout_with_context(&'_ self, context: LayoutContext) -> BoxedFormattedLayout<'_> {
+        todo!()
     }
 
     fn as_any(&self) -> &dyn Any {

@@ -3,7 +3,7 @@ use crate::ext::{
     SizedLayoutResult, StrLayoutResult, TakeBackIterator,
 };
 use crate::ext::{BoxedFormattedLayout, Style, box_formatted_layout, rc_layout};
-use crate::{Dimension, Layout, LayoutOptions, WrapMode};
+use crate::{Dimension, Layout, LayoutContext, LayoutOptions, MeasureMode, Measurements, WrapMode};
 use std::any::Any;
 use std::fmt::Write;
 
@@ -221,8 +221,16 @@ impl Layout for Paragraph {
         self.pref_dim(max_len, WrapMode::default_truncate())
     }
 
+    fn measure(&self, mode: MeasureMode) -> Measurements {
+        todo!()
+    }
+
     fn layout_strict(&'_ self, options: LayoutOptions) -> BoxedFormattedLayout<'_> {
         FormattedParagraph::new(self, self.initial_style, options).into()
+    }
+
+    fn layout_with_context(&'_ self, context: LayoutContext) -> BoxedFormattedLayout<'_> {
+        todo!()
     }
 
     fn as_any(&self) -> &dyn Any {

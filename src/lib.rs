@@ -25,6 +25,9 @@ pub mod ext;
 pub mod widgets;
 
 // Reexports
+pub use core::measurements::MeasureMode;
+pub use core::measurements::Measurements;
+pub use core::options::LayoutContext;
 pub use core::geometry::Dimension;
 pub use core::geometry::Rect;
 pub use core::layout::BoxedFormattedLayout;

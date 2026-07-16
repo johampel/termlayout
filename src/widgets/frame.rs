@@ -1,9 +1,7 @@
 use crate::ext::DisplayStr;
 use crate::widgets::FrameDecoration;
 use crate::widgets::frame::formatted::FormattedFrame;
-use crate::{
-    BoxedFormattedLayout, Dimension, Layout, LayoutOptions, RcLayout, Rect, WrapMode, rc_layout,
-};
+use crate::{rc_layout, BoxedFormattedLayout, Dimension, Layout, LayoutOptions, MeasureMode, RcLayout, Rect, WrapMode, Measurements, LayoutContext};
 use std::any::Any;
 use std::cmp::max;
 
@@ -85,6 +83,10 @@ impl Layout for Frame {
         self.decoration.frame_dim(dim, self.title.is_some())
     }
 
+    fn measure(&self, mode: MeasureMode) -> Measurements {
+        todo!()
+    }
+
     fn layout_strict(&'_ self, options: LayoutOptions) -> BoxedFormattedLayout<'_> {
         let (left_margin, right_margin) = (
             self.decoration.get_left_margin(),
@@ -109,6 +111,10 @@ impl Layout for Frame {
         content_options.fill_rows = right_margin > 0;
         let formatted = self.content.layout_strict(content_options);
         FormattedFrame::new(formatted, self.title.as_deref(), &self.decoration, options).into()
+    }
+
+    fn layout_with_context(&'_ self, context: LayoutContext) -> BoxedFormattedLayout<'_> {
+        todo!()
     }
 
     fn as_any(&self) -> &dyn Any {

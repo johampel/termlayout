@@ -1,4 +1,4 @@
-use crate::{Dimension, LayoutOptions, WrapMode};
+use crate::{Dimension, LayoutContext, LayoutOptions, MeasureMode, Measurements, WrapMode};
 use std::any::Any;
 use std::fmt::{Display, Error, Formatter, Write};
 use std::rc::Rc;
@@ -99,14 +99,17 @@ pub trait Layout {
     /// let dimension = layout.pref_dim(4, WrapMode::default_truncate());
     /// assert_eq!(dimension, Dimension::new(4, 5));
     /// ```
-    fn pref_dim(&self, max_width: usize, wrap_mode: WrapMode) -> Dimension;
+    #[deprecated(since = "0.1.1", note = "Use `measure()` instead")]
+    fn pref_dim(&self, max_width: usize, wrap_mode: WrapMode) -> Dimension {
+        self.measure(MeasureMode::pref(max_width, wrap_mode)).dim
+    }
 
     /// Calculates the [`Dimension`] of this layout based on the given `max_width`.
     /// The result is similar to [`pref_dim()`](Layout::pref_dim), but returns a dimension with
     /// exactly the given `max_width`.
     ///
     /// # Parameters
-    /// - `max_width` - The maximum width the result `Dimension` has. The concrete width
+    /// - `width` - The maximum width the result `Dimension` has. The concrete width
     ///   might be less or equal; but never larger
     /// - `wrap_mode` - The [`WrapMode`] to apply when lay out.
     ///
@@ -126,9 +129,9 @@ pub trait Layout {
     /// let dimension = layout.pref_dim_fixed_width(13, WrapMode::Wrap);
     /// assert_eq!(dimension, Dimension::new(13, 2));
     /// ```
-    fn pref_dim_fixed_width(&self, max_width: usize, wrap_mode: WrapMode) -> Dimension {
-        let dim = self.pref_dim(max_width, wrap_mode);
-        Dimension::new(max_width, dim.height)
+    #[deprecated(since = "0.1.1", note = "Use `measure()` instead")]
+    fn pref_dim_fixed_width(&self, width: usize, wrap_mode: WrapMode) -> Dimension {
+        self.measure(MeasureMode::FixedWidth {width, wrap_mode}).dim
     }
 
     /// Returns the [`Dimension`] with the minimal width that can be used to display this
@@ -151,8 +154,13 @@ pub trait Layout {
     ///
     /// assert_eq!(dimension, Dimension::new(5, 4));
     ///```
-    fn min_dim(&self) -> Dimension;
+    #[deprecated(since = "0.1.1", note = "Use `measure()` instead")]
+    fn min_dim(&self) -> Dimension {
+        self.measure(MeasureMode::Min).dim
+    }
 
+    fn measure(&self, mode: MeasureMode) -> Measurements;
+    
     /// Generates a [`FormattedLayout`] so that the content does not exceed `max_width` columns
     /// and is wrapped if required.
     ///
@@ -210,8 +218,14 @@ pub trait Layout {
         max_width: usize,
         wrap_mode: WrapMode,
     ) -> BoxedFormattedLayout<'_> {
-        let dim = self.pref_dim(max_width, wrap_mode);
-        self.layout_strict(LayoutOptions::new(dim, false, wrap_mode, None))
+        let measurements = self.measure(MeasureMode::pref(max_width, wrap_mode));
+        let options = LayoutOptions::new(
+            measurements.dim,
+            false,
+            wrap_mode,
+            None
+        );
+        self.layout_with_context(LayoutContext::new(options, measurements))
     }
 
     /// Creates a [`FormattedLayout`] that strictly follows the provided [`LayoutOptions`].
@@ -245,7 +259,13 @@ pub trait Layout {
     ///         "                      \n"
     ///     ));
     /// ```
-    fn layout_strict(&'_ self, options: LayoutOptions) -> BoxedFormattedLayout<'_>;
+    fn layout_strict(&'_ self, options: LayoutOptions) -> BoxedFormattedLayout<'_> {
+        let measurements = self.measure(MeasureMode::exact(options.dim, options.wrap_mode));
+        let context = LayoutContext::new(options, measurements);
+        self.layout_with_context(context)
+    }
+    
+    fn layout_with_context(&'_ self, context: LayoutContext) -> BoxedFormattedLayout<'_>;
 
     /// Returns `self` as a `&dyn Any`, allowing for runtime type introspection.
     ///

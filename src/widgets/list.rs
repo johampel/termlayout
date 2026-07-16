@@ -5,10 +5,7 @@ use crate::ext::{
 use crate::widgets::lines::LinesTrimming;
 use crate::widgets::vertical::FormattedVertical;
 use crate::widgets::{Lines, LinesAlignment};
-use crate::{
-    BoxedFormattedLayout, Dimension, Layout, LayoutOptions, RcLayout, Rect, WrapMode,
-    box_formatted_layout, rc_layout,
-};
+use crate::{box_formatted_layout, rc_layout, BoxedFormattedLayout, Dimension, Layout, LayoutOptions, MeasureMode, RcLayout, Rect, WrapMode, Measurements, LayoutContext};
 use std::any::Any;
 use std::cmp::max;
 use std::fmt::Write;
@@ -243,6 +240,10 @@ impl Layout for List {
         dim
     }
 
+    fn measure(&self, mode: MeasureMode) -> Measurements {
+        todo!()
+    }
+
     fn layout_strict(&'_ self, options: LayoutOptions) -> BoxedFormattedLayout<'_> {
         let (marker_width, item_width) = self.calculate_widths(options.dim.width);
         let mut row = 0;
@@ -274,6 +275,10 @@ impl Layout for List {
             })
             .collect();
         FormattedVertical::new(content, options.with_normalized_horizontal_clip()).into()
+    }
+
+    fn layout_with_context(&'_ self, context: LayoutContext) -> BoxedFormattedLayout<'_> {
+        todo!()
     }
 
     fn as_any(&self) -> &dyn Any {

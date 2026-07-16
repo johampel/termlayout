@@ -1,4 +1,25 @@
-use crate::{Dimension, Rect};
+use crate::{Dimension, Measurements, Rect};
+use crate::core::measurements;
+
+pub struct  LayoutContext  {
+    pub options: LayoutOptions,
+    pub measurements: Measurements,
+}
+
+impl LayoutContext {
+    pub fn new(options: LayoutOptions, measurements: Measurements) -> Self {
+        Self {
+            options,
+            measurements,
+        }
+    }
+}
+
+impl Into<LayoutOptions> for LayoutContext {
+    fn into(self) -> LayoutOptions {
+        self.options
+    }
+}
 
 /// Configuration settings that control how a layout is rendered.
 ///

@@ -1,9 +1,7 @@
 mod formatted;
 pub(crate) mod metrics;
 
-use crate::{
-    BoxedFormattedLayout, Dimension, Layout, LayoutOptions, RcLayout, Rect, WrapMode, rc_layout,
-};
+use crate::{rc_layout, BoxedFormattedLayout, Dimension, Layout, LayoutOptions, MeasureMode, RcLayout, Rect, WrapMode, Measurements, LayoutContext};
 use std::any::Any;
 use std::cmp::min;
 
@@ -632,6 +630,10 @@ impl Layout for Cell {
         self.calculate_dims(None, WrapMode::Wrap).0
     }
 
+    fn measure(&self, mode: MeasureMode) -> Measurements {
+        todo!()
+    }
+
     fn layout_strict(&'_ self, options: LayoutOptions) -> BoxedFormattedLayout<'_> {
         let (_, content_dim) = self.calculate_dims(Some(options.dim.width), options.wrap_mode);
         let metrics = metrics::CellMetrics::new(&options, content_dim, self.clip, self.anchor);
@@ -647,6 +649,10 @@ impl Layout for Cell {
             metrics.padding,
             cell_options,
         ))
+    }
+
+    fn layout_with_context(&'_ self, context: LayoutContext) -> BoxedFormattedLayout<'_> {
+        todo!()
     }
 
     fn as_any(&self) -> &dyn Any {

@@ -3,7 +3,7 @@ use crate::ext::{
     LayoutWriter, SizedLayoutResult,
 };
 use crate::ext::{box_formatted_layout, rc_layout};
-use crate::{Dimension, Layout, LayoutOptions, WrapMode};
+use crate::{Dimension, Layout, LayoutContext, LayoutOptions, MeasureMode, Measurements, WrapMode};
 use std::any::Any;
 use std::cmp::min;
 use std::fmt::Write;
@@ -135,8 +135,16 @@ impl Layout for Filler {
         Dimension::new(self.pattern.display_len(), 1)
     }
 
+    fn measure(&self, mode: MeasureMode) -> Measurements {
+        todo!()
+    }
+
     fn layout_strict(&'_ self, options: LayoutOptions) -> BoxedFormattedLayout<'_> {
         FormattedFiller::new(&self.pattern, self.mode, options).into()
+    }
+
+    fn layout_with_context(&'_ self, context: LayoutContext) -> BoxedFormattedLayout<'_> {
+        todo!()
     }
 
     fn as_any(&self) -> &dyn Any {

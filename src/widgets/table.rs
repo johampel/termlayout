@@ -2,9 +2,7 @@ use crate::widgets::table::decoration::DecoratedTable;
 use crate::widgets::table::metrics::TableMetrics;
 use crate::widgets::vertical::FormattedVertical;
 use crate::widgets::{CellAnchor, CellWidth, TableDecoration};
-use crate::{
-    BoxedFormattedLayout, Dimension, Layout, LayoutOptions, RcLayout, Rect, WrapMode, rc_layout,
-};
+use crate::{rc_layout, BoxedFormattedLayout, Dimension, Layout, LayoutOptions, MeasureMode, RcLayout, Rect, WrapMode, Measurements, LayoutContext};
 use std::any::Any;
 
 pub(crate) mod decoration;
@@ -93,6 +91,10 @@ impl Layout for Table {
         metrics.dim()
     }
 
+    fn measure(&self, mode: MeasureMode) -> Measurements {
+        todo!()
+    }
+
     fn layout_strict(&'_ self, options: LayoutOptions) -> BoxedFormattedLayout<'_> {
         let table = DecoratedTable::new(self);
         let metrics = TableMetrics::new(&table, Some(options.dim.width), options.wrap_mode);
@@ -112,6 +114,10 @@ impl Layout for Table {
             })
             .collect();
         FormattedVertical::new(formatted, options.with_normalized_clip()).into()
+    }
+
+    fn layout_with_context(&'_ self, context: LayoutContext) -> BoxedFormattedLayout<'_> {
+        todo!()
     }
 
     fn as_any(&self) -> &dyn Any {

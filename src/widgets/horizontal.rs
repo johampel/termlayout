@@ -1,9 +1,7 @@
 use crate::widgets::Cell;
 use crate::widgets::horizontal::row::Row;
 use crate::widgets::vertical::FormattedVertical;
-use crate::{
-    BoxedFormattedLayout, Dimension, Layout, LayoutOptions, RcLayout, Rect, WrapMode, rc_layout,
-};
+use crate::{rc_layout, BoxedFormattedLayout, Dimension, Layout, LayoutOptions, MeasureMode, RcLayout, Rect, WrapMode, Measurements, LayoutContext};
 use std::any::Any;
 use std::borrow::Cow;
 use std::cmp::max;
@@ -191,6 +189,10 @@ impl Layout for Horizontal {
             .fold(Dimension::empty(), |acc, dim| acc.horizontal_union(dim.0))
     }
 
+    fn measure(&self, mode: MeasureMode) -> Measurements {
+        todo!()
+    }
+
     fn layout_strict(&'_ self, options: LayoutOptions) -> BoxedFormattedLayout<'_> {
         let cells = self.cells();
         let rows = Row::from_cells(
@@ -213,6 +215,10 @@ impl Layout for Horizontal {
             })
             .collect();
         FormattedVertical::new(formatted, options.with_normalized_clip()).into()
+    }
+
+    fn layout_with_context(&'_ self, context: LayoutContext) -> BoxedFormattedLayout<'_> {
+        todo!()
     }
 
     fn as_any(&self) -> &dyn Any {
