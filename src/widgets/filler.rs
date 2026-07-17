@@ -127,24 +127,17 @@ impl Filler {
 }
 
 impl Layout for Filler {
-    fn pref_dim(&self, max_width: usize, _wrap_mode: WrapMode) -> Dimension {
-        Dimension::new(min(self.pattern.display_len(), max_width), 1)
-    }
-
-    fn min_dim(&self) -> Dimension {
-        Dimension::new(self.pattern.display_len(), 1)
-    }
-
     fn measure(&self, mode: MeasureMode) -> Measurements {
-        todo!()
-    }
-
-    fn layout_strict(&'_ self, options: LayoutOptions) -> BoxedFormattedLayout<'_> {
-        FormattedFiller::new(&self.pattern, self.mode, options).into()
+        match mode {
+            MeasureMode::Min => Dimension::new(self.pattern.display_len(), 1).into(),
+            MeasureMode::Pref { max_width,.. } => Dimension::new(min(self.pattern.display_len(), max_width), 1).into(),
+            MeasureMode::FixedWidth { width, .. } => Dimension::new(width, 1).into(),
+            MeasureMode::Exact { dimension } => dimension.into(),
+        }
     }
 
     fn layout_with_context(&'_ self, context: LayoutContext) -> BoxedFormattedLayout<'_> {
-        todo!()
+        FormattedFiller::new(&self.pattern, self.mode, context.into()).into()
     }
 
     fn as_any(&self) -> &dyn Any {
@@ -931,9 +924,26 @@ mod tests {
     }
 
     #[test]
-    fn filler_pref_dim() {
+    fn filler_measure_min() {
         let filler = Filler::both("foobar");
-        assert_eq!(filler.pref_dim(10, WrapMode::Wrap), Dimension::new(6, 1));
-        assert_eq!(filler.pref_dim(3, WrapMode::Wrap), Dimension::new(3, 1));
+        assert_eq!(filler.measure(MeasureMode::min()).dim, Dimension::new(6, 1));
+    }
+
+    #[test]
+    fn filler_measure_pref() {
+        let filler = Filler::both("foobar");
+        assert_eq!(filler.measure(MeasureMode::pref(10, WrapMode::default())).dim, Dimension::new(6, 1));
+    }
+
+    #[test]
+    fn filler_measure_fixed_width() {
+        let filler = Filler::both("foobar");
+        assert_eq!(filler.measure(MeasureMode::fixed_width(10, WrapMode::default())).dim, Dimension::new(10, 1));
+    }
+
+    #[test]
+    fn filler_measure_exact() {
+        let filler = Filler::both("foobar");
+        assert_eq!(filler.measure(MeasureMode::exact(Dimension::new(5,3))).dim, Dimension::new(5, 3));
     }
 }
