@@ -260,7 +260,7 @@ pub trait Layout {
     ///     ));
     /// ```
     fn layout_strict(&'_ self, options: LayoutOptions) -> BoxedFormattedLayout<'_> {
-        let measurements = self.measure(MeasureMode::exact(options.dim, options.wrap_mode));
+        let measurements = self.measure(MeasureMode::exact(options.dim));
         let context = LayoutContext::new(options, measurements);
         self.layout_with_context(context)
     }

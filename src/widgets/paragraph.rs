@@ -163,10 +163,16 @@ impl Paragraph {
     pub fn block_with_style<T: Into<String>>(initial_style: Style, content: T) -> Self {
         Self::new(ParagraphAlignment::Block, Some(initial_style), content)
     }
-}
 
-impl Layout for Paragraph {
-    fn pref_dim(&self, max_width: usize, wrap_mode: WrapMode) -> Dimension {
+    fn longest_word(&self) -> usize {
+        self.content
+            .display_words()
+            .map(DisplayStr::display_len)
+            .max()
+            .unwrap_or(0)
+    }
+
+    fn calculate_dim(&self, max_width: usize, fixed_width: bool, wrap_mode: WrapMode) -> Dimension {
         if max_width == 0 {
             return Dimension::empty();
         }
@@ -174,6 +180,9 @@ impl Layout for Paragraph {
         let mut rows = 0;
         let mut line_len = 0;
         let mut words = TakeBackIterator::new(self.content.display_words());
+        if fixed_width {
+            cols = max_width
+        }
         while let Some(word) = words.next() {
             let word_len = word.display_len();
             if line_len == 0 && word_len > 0 {
@@ -210,27 +219,27 @@ impl Layout for Paragraph {
 
         Dimension::new(cols.max(line_len), rows)
     }
+}
 
-    fn min_dim(&self) -> Dimension {
-        let max_len = self
-            .content
-            .display_words()
-            .map(DisplayStr::display_len)
-            .max()
-            .unwrap_or(0);
-        self.pref_dim(max_len, WrapMode::default_truncate())
-    }
-
+impl Layout for Paragraph {
     fn measure(&self, mode: MeasureMode) -> Measurements {
-        todo!()
-    }
-
-    fn layout_strict(&'_ self, options: LayoutOptions) -> BoxedFormattedLayout<'_> {
-        FormattedParagraph::new(self, self.initial_style, options).into()
+        match mode {
+            MeasureMode::Min => {
+                self.measure(MeasureMode::pref(self.longest_word(), WrapMode::default()))
+            }
+            MeasureMode::Pref {
+                max_width,
+                wrap_mode,
+            } => self.calculate_dim(max_width, false, wrap_mode).into(),
+            MeasureMode::FixedWidth { width, wrap_mode } => {
+                self.calculate_dim(width, true, wrap_mode).into()
+            }
+            MeasureMode::Exact { dimension, .. } => dimension.into(),
+        }
     }
 
     fn layout_with_context(&'_ self, context: LayoutContext) -> BoxedFormattedLayout<'_> {
-        todo!()
+        FormattedParagraph::new(self, self.initial_style, context.into()).into()
     }
 
     fn as_any(&self) -> &dyn Any {
@@ -436,54 +445,95 @@ mod tests {
     use crate::Rect;
 
     #[test]
-    fn paragraph_pref_dim_fit() {
+    fn paragraph_measure_exact() {
         let content = "abcdefgh abcd fgh ab de gh";
-
         let paragraph = Paragraph::left(content);
         assert_eq!(
-            paragraph.pref_dim(14, WrapMode::Wrap),
+            paragraph.measure(MeasureMode::exact(Dimension::new(12, 14))).dim,
+            Dimension::new(12, 14)
+        );
+    }
+
+    #[test]
+    fn paragraph_measure_fixed_width() {
+        let content = "abcdefgh abcd fgh ab de gh";
+        let paragraph = Paragraph::left(content);
+        assert_eq!(
+            paragraph.measure(MeasureMode::fixed_width(14, WrapMode::Wrap)).dim,
+            Dimension::new(14, 2)
+        );
+        assert_eq!(
+            paragraph.measure(MeasureMode::fixed_width(14, WrapMode::default_truncate())).dim,
+            Dimension::new(14, 2)
+        );
+        assert_eq!(
+            paragraph.measure(MeasureMode::fixed_width(9, WrapMode::Wrap)).dim,
+            Dimension::new(9, 3)
+        );
+        assert_eq!(
+            paragraph.measure(MeasureMode::fixed_width(9, WrapMode::default_truncate())).dim,
+            Dimension::new(9, 3)
+        );
+    }
+
+    #[test]
+    fn paragraph_measure_pref_fit() {
+        let content = "abcdefgh abcd fgh ab de gh";
+        let paragraph = Paragraph::left(content);
+        assert_eq!(
+            paragraph.measure(MeasureMode::pref(14, WrapMode::Wrap)).dim,
             Dimension::new(13, 2)
         );
         assert_eq!(
-            paragraph.pref_dim(14, WrapMode::default_truncate()),
+            paragraph.measure(MeasureMode::pref(14, WrapMode::default_truncate())).dim,
             Dimension::new(13, 2)
         );
-        assert_eq!(paragraph.pref_dim(8, WrapMode::Wrap), Dimension::new(8, 3));
         assert_eq!(
-            paragraph.pref_dim(8, WrapMode::default_truncate()),
+            paragraph.measure(MeasureMode::pref(8, WrapMode::Wrap)).dim,
+            Dimension::new(8, 3)
+        );
+        assert_eq!(
+            paragraph.measure(MeasureMode::pref(8, WrapMode::default_truncate())).dim,
             Dimension::new(8, 3)
         );
     }
 
     #[test]
-    fn paragraph_pref_dim_wrap() {
+    fn paragraph_measure_pref_wrap() {
         let content = "abcdefgh abcd fgh ab de gh";
-
         let paragraph = Paragraph::left(content);
-        assert_eq!(paragraph.pref_dim(7, WrapMode::Wrap), Dimension::new(7, 4));
-        assert_eq!(paragraph.pref_dim(5, WrapMode::Wrap), Dimension::new(5, 6));
-    }
 
-    #[test]
-    fn paragraph_pref_dim_truncate() {
-        let content = "abcdefgh abcd fgh ab de gh";
-
-        let paragraph = Paragraph::left(content);
         assert_eq!(
-            paragraph.pref_dim(7, WrapMode::default_truncate()),
+            paragraph.measure(MeasureMode::pref(7, WrapMode::Wrap)).dim,
             Dimension::new(7, 4)
         );
         assert_eq!(
-            paragraph.pref_dim(5, WrapMode::default_truncate()),
+            paragraph.measure(MeasureMode::pref(5, WrapMode::Wrap)).dim,
+            Dimension::new(5, 6)
+        );
+    }
+
+    #[test]
+    fn paragraph_measure_pref_truncate() {
+        let content = "abcdefgh abcd fgh ab de gh";
+        let paragraph = Paragraph::left(content);
+
+        assert_eq!(
+            paragraph.measure(MeasureMode::pref(7, WrapMode::default_truncate())).dim,
+            Dimension::new(7, 4)
+        );
+        assert_eq!(
+            paragraph.measure(MeasureMode::pref(5, WrapMode::default_truncate())).dim,
             Dimension::new(5, 5)
         );
     }
-    #[test]
-    fn paragraph_min_dim() {
-        let content = "abcdefgh abcd fgh ab de gh";
 
+    #[test]
+    fn paragraph_measure_min() {
+        let content = "abcdefgh abcd fgh ab de gh";
         let paragraph = Paragraph::left(content);
-        assert_eq!(paragraph.min_dim(), Dimension::new(8, 3));
+
+        assert_eq!(paragraph.measure(MeasureMode::Min).dim, Dimension::new(8, 3));
     }
 
     #[test]

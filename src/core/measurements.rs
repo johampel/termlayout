@@ -1,5 +1,5 @@
+use crate::{Dimension, WrapMode};
 use std::any::Any;
-use crate::{Dimension, LayoutContext, WrapMode};
 
 pub enum MeasureMode {
     Min,
@@ -13,7 +13,6 @@ pub enum MeasureMode {
     },
     Exact {
         dimension: Dimension,
-        wrap_mode: WrapMode,
     },
 }
 
@@ -30,14 +29,11 @@ impl MeasureMode {
     }
 
     pub const fn fixed_width(width: usize, wrap_mode: WrapMode) -> Self {
-        Self::FixedWidth {
-            width,
-            wrap_mode,
-        }
+        Self::FixedWidth { width, wrap_mode }
     }
 
-    pub const fn exact(dimension: Dimension, wrap_mode: WrapMode) -> Self {
-        Self::Exact { dimension, wrap_mode }
+    pub const fn exact(dimension: Dimension) -> Self {
+        Self::Exact { dimension }
     }
 }
 

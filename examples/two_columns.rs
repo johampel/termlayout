@@ -3,7 +3,7 @@
 use std::any::Any;
 use termlayout::ext::{DisplayStr, LayoutWithOptions};
 use termlayout::widgets::{Cell, Filler, Horizontal, Lines};
-use termlayout::{BoxedFormattedLayout, Dimension, Layout, LayoutOptions, RcLayout, WrapMode};
+use termlayout::{BoxedFormattedLayout, Dimension, Layout, LayoutContext, LayoutOptions, MeasureMode, Measurements, RcLayout, WrapMode};
 
 #[path = "shared/mod.rs"]
 mod shared;
@@ -82,6 +82,10 @@ impl Layout for TwoColumns {
         )
     }
 
+    fn measure(&self, mode: MeasureMode) -> Measurements {
+        todo!()
+    }
+
     fn layout_strict(&'_ self, options: LayoutOptions) -> BoxedFormattedLayout<'_> {
         // if there is not enough space for two columns, we just display the content in one column
         if !self.can_display_with_two_columns(options.dim.width) {
@@ -107,6 +111,10 @@ impl Layout for TwoColumns {
         )
         .into();
         LayoutWithOptions::of(horizontal, options).into()
+    }
+
+    fn layout_with_context(&'_ self, context: LayoutContext) -> BoxedFormattedLayout<'_> {
+        todo!()
     }
 
     fn as_any(&self) -> &dyn Any {

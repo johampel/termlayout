@@ -189,7 +189,7 @@ impl Lines {
         )
     }
 
-    fn lines_dim(&self, max_width: usize, fixed_width: bool, wrap_mode: WrapMode) -> Dimension {
+    fn calculate_dim(&self, max_width: usize, fixed_width: bool, wrap_mode: WrapMode) -> Dimension {
         if max_width == 0 {
             return Dimension::empty();
         }
@@ -220,9 +220,9 @@ impl Layout for Lines {
             MeasureMode::Pref {
                 max_width,
                 wrap_mode,
-            } => self.lines_dim(max_width, false, wrap_mode).into(),
+            } => self.calculate_dim(max_width, false, wrap_mode).into(),
             MeasureMode::FixedWidth { width, wrap_mode } => {
-                self.lines_dim(width, true, wrap_mode).into()
+                self.calculate_dim(width, true, wrap_mode).into()
             }
             MeasureMode::Exact { dimension, .. } => dimension.into(),
         }
@@ -457,13 +457,70 @@ mod tests {
             Dimension::new(0, 0)
         );
     }
+    #[test]
+    fn lines_measure_fixed_width() {
+        // Wrap case
+        let lines = Lines::left("abc def\nghi\njklm");
+        assert_eq!(
+            lines.measure(MeasureMode::fixed_width(10, WrapMode::Wrap)).dim,
+            Dimension::new(10, 3)
+        );
+        assert_eq!(
+            lines.measure(MeasureMode::fixed_width(5, WrapMode::Wrap)).dim,
+            Dimension::new(5, 4)
+        );
+        assert_eq!(
+            lines.measure(MeasureMode::fixed_width(3, WrapMode::Wrap)).dim,
+            Dimension::new(3, 6)
+        );
+        assert_eq!(
+            lines.measure(MeasureMode::fixed_width(1, WrapMode::Wrap)).dim,
+            Dimension::new(1, 14)
+        );
+        assert_eq!(
+            lines.measure(MeasureMode::fixed_width(0, WrapMode::Wrap)).dim,
+            Dimension::new(0, 0)
+        );
+
+        // Truncate case
+        let lines = Lines::left("abc def\nghi\njklm");
+        assert_eq!(
+            lines
+                .measure(MeasureMode::fixed_width(10, WrapMode::Truncate("...")))
+                .dim,
+            Dimension::new(10, 3)
+        );
+        assert_eq!(
+            lines
+                .measure(MeasureMode::fixed_width(5, WrapMode::Truncate("...")))
+                .dim,
+            Dimension::new(5, 3)
+        );
+        assert_eq!(
+            lines
+                .measure(MeasureMode::fixed_width(3, WrapMode::Truncate("...")))
+                .dim,
+            Dimension::new(3, 3)
+        );
+        assert_eq!(
+            lines
+                .measure(MeasureMode::fixed_width(1, WrapMode::Truncate("...")))
+                .dim,
+            Dimension::new(1, 3)
+        );
+        assert_eq!(
+            lines
+                .measure(MeasureMode::fixed_width(0, WrapMode::Truncate("...")))
+                .dim,
+            Dimension::new(0, 0)
+        );
+    }
 
     #[test]
     fn lines_measure_exact() {
         let lines = Lines::left("abc def\nghi\njklm");
         let measurements = lines.measure(MeasureMode::exact(
-            Dimension::new(10, 5),
-            WrapMode::default(),
+            Dimension::new(10, 5)
         ));
         assert_eq!(measurements.dim, Dimension::new(10, 5));
         assert_eq!(measurements.specifics.is_none(), true);
