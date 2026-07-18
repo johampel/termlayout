@@ -3,7 +3,7 @@ use crate::ext::{
     LayoutWriter, SizedLayoutResult,
 };
 use crate::ext::{box_formatted_layout, rc_layout};
-use crate::{Dimension, Layout, LayoutContext, LayoutOptions, MeasureMode, Measurements, WrapMode};
+use crate::{Dimension, Layout, LayoutContext, LayoutOptions, MeasureMode, Measurements};
 use std::any::Any;
 use std::cmp::min;
 use std::fmt::Write;
@@ -132,7 +132,7 @@ impl Layout for Filler {
             MeasureMode::Min => Dimension::new(self.pattern.display_len(), 1).into(),
             MeasureMode::Pref { max_width,.. } => Dimension::new(min(self.pattern.display_len(), max_width), 1).into(),
             MeasureMode::FixedWidth { width, .. } => Dimension::new(width, 1).into(),
-            MeasureMode::Exact { dimension } => dimension.into(),
+            MeasureMode::Exact { dimension,.. } => dimension.into(),
         }
     }
 
@@ -253,7 +253,7 @@ impl<'wrt> LayoutWriter<'wrt> for FillerWriter<'wrt> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::Rect;
+    use crate::{Rect, WrapMode};
 
     #[test]
     fn formatted_filler_once_fit() {
@@ -932,7 +932,7 @@ mod tests {
     #[test]
     fn filler_measure_pref() {
         let filler = Filler::both("foobar");
-        assert_eq!(filler.measure(MeasureMode::pref(10, WrapMode::default())).dim, Dimension::new(6, 1));
+        assert_eq!(filler.measure(MeasureMode::pref_width(10, WrapMode::default())).dim, Dimension::new(6, 1));
     }
 
     #[test]
@@ -944,6 +944,6 @@ mod tests {
     #[test]
     fn filler_measure_exact() {
         let filler = Filler::both("foobar");
-        assert_eq!(filler.measure(MeasureMode::exact(Dimension::new(5,3))).dim, Dimension::new(5, 3));
+        assert_eq!(filler.measure(MeasureMode::exact(Dimension::new(5,3), WrapMode::default())).dim, Dimension::new(5, 3));
     }
 }

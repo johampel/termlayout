@@ -225,7 +225,7 @@ impl Layout for Paragraph {
     fn measure(&self, mode: MeasureMode) -> Measurements {
         match mode {
             MeasureMode::Min => {
-                self.measure(MeasureMode::pref(self.longest_word(), WrapMode::default()))
+                self.measure(MeasureMode::pref_width(self.longest_word(), WrapMode::default()))
             }
             MeasureMode::Pref {
                 max_width,
@@ -449,7 +449,7 @@ mod tests {
         let content = "abcdefgh abcd fgh ab de gh";
         let paragraph = Paragraph::left(content);
         assert_eq!(
-            paragraph.measure(MeasureMode::exact(Dimension::new(12, 14))).dim,
+            paragraph.measure(MeasureMode::exact(Dimension::new(12, 14), WrapMode::default())).dim,
             Dimension::new(12, 14)
         );
     }
@@ -481,19 +481,19 @@ mod tests {
         let content = "abcdefgh abcd fgh ab de gh";
         let paragraph = Paragraph::left(content);
         assert_eq!(
-            paragraph.measure(MeasureMode::pref(14, WrapMode::Wrap)).dim,
+            paragraph.measure(MeasureMode::pref_width(14, WrapMode::Wrap)).dim,
             Dimension::new(13, 2)
         );
         assert_eq!(
-            paragraph.measure(MeasureMode::pref(14, WrapMode::default_truncate())).dim,
+            paragraph.measure(MeasureMode::pref_width(14, WrapMode::default_truncate())).dim,
             Dimension::new(13, 2)
         );
         assert_eq!(
-            paragraph.measure(MeasureMode::pref(8, WrapMode::Wrap)).dim,
+            paragraph.measure(MeasureMode::pref_width(8, WrapMode::Wrap)).dim,
             Dimension::new(8, 3)
         );
         assert_eq!(
-            paragraph.measure(MeasureMode::pref(8, WrapMode::default_truncate())).dim,
+            paragraph.measure(MeasureMode::pref_width(8, WrapMode::default_truncate())).dim,
             Dimension::new(8, 3)
         );
     }
@@ -504,11 +504,11 @@ mod tests {
         let paragraph = Paragraph::left(content);
 
         assert_eq!(
-            paragraph.measure(MeasureMode::pref(7, WrapMode::Wrap)).dim,
+            paragraph.measure(MeasureMode::pref_width(7, WrapMode::Wrap)).dim,
             Dimension::new(7, 4)
         );
         assert_eq!(
-            paragraph.measure(MeasureMode::pref(5, WrapMode::Wrap)).dim,
+            paragraph.measure(MeasureMode::pref_width(5, WrapMode::Wrap)).dim,
             Dimension::new(5, 6)
         );
     }
@@ -519,11 +519,11 @@ mod tests {
         let paragraph = Paragraph::left(content);
 
         assert_eq!(
-            paragraph.measure(MeasureMode::pref(7, WrapMode::default_truncate())).dim,
+            paragraph.measure(MeasureMode::pref_width(7, WrapMode::default_truncate())).dim,
             Dimension::new(7, 4)
         );
         assert_eq!(
-            paragraph.measure(MeasureMode::pref(5, WrapMode::default_truncate())).dim,
+            paragraph.measure(MeasureMode::pref_width(5, WrapMode::default_truncate())).dim,
             Dimension::new(5, 5)
         );
     }

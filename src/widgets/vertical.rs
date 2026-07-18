@@ -1,8 +1,12 @@
+use crate::core::measurements::MeasurementSpecifics;
 use crate::ext::{
     BaseLayoutWriter, BoxedLayoutWriter, FormattedLayout, LayoutWriter, SizedLayoutResult,
 };
 use crate::ext::{BoxedFormattedLayout, box_formatted_layout, rc_layout};
-use crate::{Dimension, Layout, LayoutContext, LayoutOptions, MeasureMode, Measurements, RcLayout, Rect, WrapMode};
+use crate::{
+    Dimension, Layout, LayoutContext, LayoutOptions, MeasureMode, Measurements, RcLayout,
+    WrapMode,
+};
 use std::any::Any;
 use std::fmt::Write;
 
@@ -50,6 +54,35 @@ impl Vertical {
             content: content.into_iter().map(Into::into).collect(),
         }
     }
+
+    fn measure_exact(&self, dimension: Dimension, wrap_mode: WrapMode) -> Measurements {
+        let mut height = dimension.height;
+        let mut children = Vec::with_capacity(self.content.len());
+        for (index, item) in self.content.iter().enumerate() {
+            if height == 0 {
+                break;
+            }
+            let measurement = if index + 1 < self.content.len() {
+                let measurement = item.measure(MeasureMode::fixed_width(dimension.width, wrap_mode));
+                if measurement.dim.height > height {
+                    item.measure(MeasureMode::exact(
+                        Dimension::new(dimension.width, height),
+                        wrap_mode,
+                    ))
+                } else {
+                    measurement
+                }
+            } else {
+                item.measure(MeasureMode::exact(
+                    Dimension::new(dimension.width, height),
+                    wrap_mode,
+                ))
+            };
+            height = height.saturating_sub(measurement.dim.height);
+            children.push(measurement);
+        }
+        Measurements::new(dimension, MeasurementSpecifics::Children(children))
+    }
 }
 
 impl<const N: usize> From<[RcLayout; N]> for Vertical {
@@ -65,45 +98,33 @@ impl Default for Vertical {
 }
 
 impl Layout for Vertical {
-    fn pref_dim(&self, max_width: usize, wrap_mode: WrapMode) -> Dimension {
-        self.content.iter().fold(Dimension::empty(), |acc, layout| {
-            acc.vertical_union(layout.pref_dim(max_width, wrap_mode))
-        })
-    }
-
-    fn min_dim(&self) -> Dimension {
-        self.content.iter().fold(Dimension::empty(), |acc, layout| {
-            acc.vertical_union(layout.min_dim())
-        })
-    }
-
     fn measure(&self, mode: MeasureMode) -> Measurements {
-        todo!()
-    }
-
-    fn layout_strict(&'_ self, options: LayoutOptions) -> BoxedFormattedLayout<'_> {
-        if self.content.len() == 1 {
-            return self.content[0].layout_strict(options);
+        match mode {
+            MeasureMode::Exact {
+                dimension,
+                wrap_mode,
+            } => self.measure_exact(dimension, wrap_mode),
+            _ => Measurements::fold_vertically(self.content.iter(), mode)
         }
-
-        let mut formatted = Vec::with_capacity(self.content.len());
-        let mut row = 0;
-        for layout in &self.content {
-            // Compute the options of the child layout
-            let rect = Rect::new(
-                0,
-                row,
-                layout.pref_dim_fixed_width(options.dim.width, options.wrap_mode),
-            );
-            row += rect.dim.height;
-            let layout_opts = options.intersect(rect, false);
-            formatted.push(layout.layout_strict(layout_opts));
-        }
-        FormattedVertical::new(formatted, options).into()
     }
 
     fn layout_with_context(&'_ self, context: LayoutContext) -> BoxedFormattedLayout<'_> {
-        todo!()
+        // Validate, whether options fit
+        if context.measurements.specifics.children().is_none() {
+            return self.layout_strict(context.options);
+        }
+
+        // Go on with our stuff
+        let child_measurements = context.measurements.specifics.children().unwrap();
+        let mut y = 0;
+        let children = self.content.iter().zip(child_measurements.iter())
+            .map(|(l, m)| {
+                let ctxt = LayoutContext::derive(m, 0,y, &context.options, false);
+                y += ctxt.options.dim.height;
+                l.layout_with_context(ctxt)
+            })
+            .collect();
+        FormattedVertical::new(children, context.options).into()
     }
 
     fn as_any(&self) -> &dyn Any {
@@ -198,11 +219,12 @@ impl<'wrt> LayoutWriter<'wrt> for VerticalWriter<'wrt> {
 
 #[cfg(test)]
 mod tests {
+    use crate::Rect;
     use super::*;
     use crate::widgets::Lines;
 
     #[test]
-    fn vertical_pref_dim() {
+    fn vertical_measure_pref_width() {
         // Arrange
         let lines1 = Lines::left(concat!("The quick brown fox jumps over\n", "the lazy dog."));
         let lines2 = Lines::center(concat!("To be or not to be,\n", "that is the question."));
@@ -210,52 +232,52 @@ mod tests {
         let vertical = Vertical::new(vec![lines1, lines2, lines3]);
 
         // Wrap case
-        assert_eq!(vertical.pref_dim(30, WrapMode::Wrap), Dimension::new(30, 7));
-        assert_eq!(vertical.pref_dim(25, WrapMode::Wrap), Dimension::new(25, 8));
+        assert_eq!(vertical.measure(MeasureMode::pref_width(30, WrapMode::Wrap)).dim, Dimension::new(30, 7));
+        assert_eq!(vertical.measure(MeasureMode::pref_width(25, WrapMode::Wrap)).dim, Dimension::new(25, 8));
         assert_eq!(
-            vertical.pref_dim(15, WrapMode::Wrap),
+            vertical.measure(MeasureMode::pref_width(15, WrapMode::Wrap)).dim,
             Dimension::new(15, 10)
         );
-        assert_eq!(vertical.pref_dim(5, WrapMode::Wrap), Dimension::new(5, 21));
-        assert_eq!(vertical.pref_dim(1, WrapMode::Wrap), Dimension::new(1, 94));
-        assert_eq!(vertical.pref_dim(0, WrapMode::Wrap), Dimension::empty());
+        assert_eq!(vertical.measure(MeasureMode::pref_width(5, WrapMode::Wrap)).dim, Dimension::new(5, 21));
+        assert_eq!(vertical.measure(MeasureMode::pref_width(1, WrapMode::Wrap)).dim, Dimension::new(1, 94));
+        assert_eq!(vertical.measure(MeasureMode::pref_width(0, WrapMode::Wrap)).dim, Dimension::empty());
 
         // Truncate case
         assert_eq!(
-            vertical.pref_dim(30, WrapMode::Truncate("...")),
+            vertical.measure(MeasureMode::pref_width(30, WrapMode::Truncate("..."))).dim,
             Dimension::new(30, 7)
         );
         assert_eq!(
-            vertical.pref_dim(25, WrapMode::Truncate("...")),
+            vertical.measure(MeasureMode::pref_width(25, WrapMode::Truncate("..."))).dim,
             Dimension::new(25, 7)
         );
         assert_eq!(
-            vertical.pref_dim(15, WrapMode::Truncate("...")),
+            vertical.measure(MeasureMode::pref_width(15, WrapMode::Truncate("..."))).dim,
             Dimension::new(15, 7)
         );
         assert_eq!(
-            vertical.pref_dim(5, WrapMode::Truncate("...")),
+            vertical.measure(MeasureMode::pref_width(5, WrapMode::Truncate("..."))).dim,
             Dimension::new(5, 7)
         );
         assert_eq!(
-            vertical.pref_dim(1, WrapMode::Truncate("...")),
+            vertical.measure(MeasureMode::pref_width(1, WrapMode::Truncate("..."))).dim,
             Dimension::new(1, 7)
         );
         assert_eq!(
-            vertical.pref_dim(0, WrapMode::Truncate("...")),
+            vertical.measure(MeasureMode::pref_width(0, WrapMode::Truncate("..."))).dim,
             Dimension::empty()
         );
     }
 
     #[test]
-    fn vertical_min_dim() {
+    fn vertical_measure_min() {
         // Arrange
         let lines1 = Lines::left(concat!("The quick brown fox jumps over\n", "the lazy dog."));
         let lines2 = Lines::center(concat!("To be or not to be,\n", "that is the question."));
         let lines3 = Lines::right(concat!("Life\n", "is\n", "life."));
         let vertical = Vertical::new(vec![lines1, lines2, lines3]);
 
-        assert_eq!(vertical.min_dim(), Dimension::new(30, 7));
+        assert_eq!(vertical.measure(MeasureMode::min()).dim, Dimension::new(30, 7));
     }
 
     #[test]

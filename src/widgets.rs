@@ -25,8 +25,8 @@ pub(crate) mod tree;
 pub(crate) mod vertical;
 pub use cell::Cell;
 pub use cell::CellAnchor;
-pub use cell::CellDimension;
-pub use cell::CellWidth;
+pub use cell::dimension::CellDimension;
+pub use cell::dimension::CellWidth;
 
 pub use filler::FillMode;
 pub use filler::Filler;

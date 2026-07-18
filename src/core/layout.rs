@@ -101,7 +101,7 @@ pub trait Layout {
     /// ```
     #[deprecated(since = "0.1.1", note = "Use `measure()` instead")]
     fn pref_dim(&self, max_width: usize, wrap_mode: WrapMode) -> Dimension {
-        self.measure(MeasureMode::pref(max_width, wrap_mode)).dim
+        self.measure(MeasureMode::pref_width(max_width, wrap_mode)).dim
     }
 
     /// Calculates the [`Dimension`] of this layout based on the given `max_width`.
@@ -218,14 +218,14 @@ pub trait Layout {
         max_width: usize,
         wrap_mode: WrapMode,
     ) -> BoxedFormattedLayout<'_> {
-        let measurements = self.measure(MeasureMode::pref(max_width, wrap_mode));
+        let measurements = self.measure(MeasureMode::pref_width(max_width, wrap_mode));
         let options = LayoutOptions::new(
             measurements.dim,
             false,
             wrap_mode,
             None
         );
-        self.layout_with_context(LayoutContext::new(options, measurements))
+        self.layout_with_context(LayoutContext::new(options, &measurements))
     }
 
     /// Creates a [`FormattedLayout`] that strictly follows the provided [`LayoutOptions`].
@@ -260,8 +260,8 @@ pub trait Layout {
     ///     ));
     /// ```
     fn layout_strict(&'_ self, options: LayoutOptions) -> BoxedFormattedLayout<'_> {
-        let measurements = self.measure(MeasureMode::exact(options.dim));
-        let context = LayoutContext::new(options, measurements);
+        let measurements = self.measure(MeasureMode::exact(options.dim, options.wrap_mode));
+        let context = LayoutContext::new(options,&measurements);
         self.layout_with_context(context)
     }
     

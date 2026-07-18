@@ -1,21 +1,26 @@
 use crate::{Dimension, Measurements, Rect};
-use crate::core::measurements;
 
-pub struct  LayoutContext  {
+pub struct  LayoutContext<'a>  {
     pub options: LayoutOptions,
-    pub measurements: Measurements,
+    pub measurements: &'a Measurements,
 }
 
-impl LayoutContext {
-    pub fn new(options: LayoutOptions, measurements: Measurements) -> Self {
+impl<'a> LayoutContext<'a> {
+    pub fn new(options: LayoutOptions, measurements: &'a Measurements) -> Self {
         Self {
             options,
             measurements,
         }
     }
+
+    pub fn derive(measurements: &'a Measurements, x: usize, y: usize, options: &LayoutOptions, adjust_fill_rows: bool) -> Self
+    {
+        Self::new(options.intersect(Rect::new(x, y, measurements.dim), adjust_fill_rows), measurements)
+    }
+
 }
 
-impl Into<LayoutOptions> for LayoutContext {
+impl<'a> Into<LayoutOptions> for LayoutContext<'a> {
     fn into(self) -> LayoutOptions {
         self.options
     }
