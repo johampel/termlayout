@@ -836,7 +836,7 @@ mod tests {
     use crate::widgets::Lines;
 
     #[test]
-    fn cell_pref_dim() {
+    fn cell_measure_pref_width() {
         let content: RcLayout = Lines::left("abcde\nfghij").into();
 
         let cell = Cell::new(
@@ -846,7 +846,7 @@ mod tests {
             None,
             CellAnchor::Center,
         );
-        assert_eq!(cell.pref_dim(4, WrapMode::Wrap), Dimension::new(4, 4));
+        assert_eq!(cell.measure(MeasureMode::pref_width(4, WrapMode::Wrap)).dim, Dimension::new(4, 4));
 
         let cell = Cell::new(
             content.clone(),
@@ -855,11 +855,11 @@ mod tests {
             None,
             CellAnchor::NorthWest,
         );
-        assert_eq!(cell.pref_dim(20, WrapMode::Wrap), Dimension::new(10, 2));
+        assert_eq!(cell.measure(MeasureMode::pref_width(20, WrapMode::Wrap)).dim, Dimension::new(10, 2));
     }
 
     #[test]
-    fn cell_min_dim() {
+    fn cell_measure_min() {
         let content: RcLayout = Lines::left("abcde\nfghij").into();
 
         let cell = Cell::new(
@@ -869,7 +869,7 @@ mod tests {
             None,
             CellAnchor::Center,
         );
-        assert_eq!(cell.min_dim(), Dimension::new(5, 2));
+        assert_eq!(cell.measure(MeasureMode::min()).dim, Dimension::new(5, 2));
 
         let cell = Cell::new(
             content.clone(),
@@ -878,7 +878,7 @@ mod tests {
             None,
             CellAnchor::NorthWest,
         );
-        assert_eq!(cell.min_dim(), Dimension::new(10, 2));
+        assert_eq!(cell.measure(MeasureMode::min()).dim, Dimension::new(10, 2));
     }
 
     #[test]
