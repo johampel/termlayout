@@ -99,6 +99,10 @@ impl Default for Vertical {
 
 impl Layout for Vertical {
     fn measure(&self, mode: MeasureMode) -> Measurements {
+        if mode.is_empty() {
+            return Measurements::empty()
+                .with_specifics(MeasurementSpecifics::Children(vec![]));
+        }
         match mode {
             MeasureMode::Exact {
                 dimension,

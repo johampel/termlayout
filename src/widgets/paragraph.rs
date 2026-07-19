@@ -223,11 +223,14 @@ impl Paragraph {
 
 impl Layout for Paragraph {
     fn measure(&self, mode: MeasureMode) -> Measurements {
+        if mode.is_empty() {
+            return Measurements::empty();
+        }
         match mode {
             MeasureMode::Min => {
                 self.measure(MeasureMode::pref_width(self.longest_word(), WrapMode::default()))
             }
-            MeasureMode::Pref {
+            MeasureMode::PrefWidth {
                 max_width,
                 wrap_mode,
             } => self.calculate_dim(max_width, false, wrap_mode).into(),

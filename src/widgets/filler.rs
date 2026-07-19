@@ -128,9 +128,12 @@ impl Filler {
 
 impl Layout for Filler {
     fn measure(&self, mode: MeasureMode) -> Measurements {
+        if mode.is_empty() {
+            return Measurements::empty();
+        }
         match mode {
             MeasureMode::Min => Dimension::new(self.pattern.display_len(), 1).into(),
-            MeasureMode::Pref { max_width,.. } => Dimension::new(min(self.pattern.display_len(), max_width), 1).into(),
+            MeasureMode::PrefWidth { max_width,.. } => Dimension::new(min(self.pattern.display_len(), max_width), 1).into(),
             MeasureMode::FixedWidth { width, .. } => Dimension::new(width, 1).into(),
             MeasureMode::Exact { dimension,.. } => dimension.into(),
         }

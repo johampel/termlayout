@@ -275,8 +275,8 @@ impl CellWidth {
 
 #[cfg(test)]
 mod tests {
+    use crate::widgets::{CellWidth, Paragraph};
     use crate::{Dimension, MeasureMode, RcLayout, WrapMode};
-    use crate::widgets::{CellDimension, CellWidth, Paragraph};
 
     #[test]
     fn cell_width_measure_minimal() {

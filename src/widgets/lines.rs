@@ -215,9 +215,12 @@ impl Default for Lines {
 
 impl Layout for Lines {
     fn measure(&self, mode: MeasureMode) -> Measurements {
+        if mode.is_empty() {
+            return Measurements::empty();
+        }
         match mode {
             MeasureMode::Min => self.measure(MeasureMode::pref_width(usize::MAX, WrapMode::Truncate(""))),
-            MeasureMode::Pref {
+            MeasureMode::PrefWidth {
                 max_width,
                 wrap_mode,
             } => self.calculate_dim(max_width, false, wrap_mode).into(),

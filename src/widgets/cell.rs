@@ -9,6 +9,7 @@ use crate::{
 };
 use std::any::Any;
 use std::cmp::min;
+use crate::core::measurements::MeasurementSpecifics;
 
 /// A container widget with pre-sized content and positioning control.
 ///
@@ -627,6 +628,10 @@ impl From<RcLayout> for Cell {
 
 impl Layout for Cell {
     fn measure(&self, mode: MeasureMode) -> Measurements {
+        if mode.is_empty() {
+            return Measurements::empty()
+                .with_specifics(MeasurementSpecifics::Child(Measurements::empty().into()));
+        }
         self.dim.measure(&self.content, mode)
     }
 

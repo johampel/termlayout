@@ -1,9 +1,11 @@
-use crate::ext::DisplayStr;
+use crate::core::measurements::MeasurementSpecifics;
 use crate::widgets::FrameDecoration;
 use crate::widgets::frame::formatted::FormattedFrame;
-use crate::{rc_layout, BoxedFormattedLayout, Dimension, Layout, LayoutOptions, MeasureMode, RcLayout, Rect, WrapMode, Measurements, LayoutContext};
+use crate::{
+    BoxedFormattedLayout, Dimension, Layout, LayoutContext, LayoutOptions, MeasureMode,
+    Measurements, RcLayout, Rect, rc_layout,
+};
 use std::any::Any;
-use std::cmp::max;
 
 pub(crate) mod decoration;
 mod formatted;
@@ -65,56 +67,69 @@ impl Frame {
 }
 
 impl Layout for Frame {
-    fn pref_dim(&self, max_width: usize, wrap_mode: WrapMode) -> Dimension {
-        if max_width == 0 {
-            return Dimension::empty();
-        }
-        let hmargin = self.decoration.get_left_margin() + self.decoration.get_right_margin();
-        let content_width = max(1, max_width.saturating_sub(hmargin));
-        let dim = self.content.pref_dim(content_width, wrap_mode);
-        self.decoration.frame_dim(dim, self.title.is_some())
-    }
-
-    fn min_dim(&self) -> Dimension {
-        let mut dim = self.content.min_dim();
-        if let Some(title) = &self.title {
-            dim.width = max(title.display_len(), dim.width);
-        }
-        self.decoration.frame_dim(dim, self.title.is_some())
-    }
 
     fn measure(&self, mode: MeasureMode) -> Measurements {
-        todo!()
-    }
-
-    fn layout_strict(&'_ self, options: LayoutOptions) -> BoxedFormattedLayout<'_> {
-        let (left_margin, right_margin) = (
-            self.decoration.get_left_margin(),
-            self.decoration.get_right_margin(),
-        );
-        let (top_margin, bottom_margin) = (
-            self.decoration.get_top_margin(self.title.is_some()),
-            self.decoration.get_bottom_margin(self.title.is_some()),
-        );
-        let content_rect = Rect::new(
-            left_margin,
-            top_margin,
-            Dimension::new(
-                options.dim.width.saturating_sub(left_margin + right_margin),
-                options
-                    .dim
-                    .height
-                    .saturating_sub(top_margin + bottom_margin),
-            ),
-        );
-        let mut content_options = options.intersect(content_rect, false);
-        content_options.fill_rows = right_margin > 0;
-        let formatted = self.content.layout_strict(content_options);
-        FormattedFrame::new(formatted, self.title.as_deref(), &self.decoration, options).into()
+        if mode.is_empty() {
+            return Measurements::empty()
+                .with_specifics(MeasurementSpecifics::Child(Measurements::empty().into()));
+        }
+        let hmargin = self.decoration.get_left_margin() + self.decoration.get_right_margin();
+        let vmargin = self.decoration.get_top_margin(self.title.is_some())
+            + self.decoration.get_bottom_margin(self.title.is_some());
+        let inner = match mode {
+            MeasureMode::Min => self.content.measure(mode),
+            MeasureMode::PrefWidth {
+                max_width,
+                wrap_mode,
+            } => self.content.measure(MeasureMode::PrefWidth {
+                max_width: max_width.saturating_sub(hmargin),
+                wrap_mode,
+            }),
+            MeasureMode::FixedWidth { width, wrap_mode } => {
+                self.content.measure(MeasureMode::FixedWidth {
+                    width: width.saturating_sub(hmargin),
+                    wrap_mode,
+                })
+            }
+            MeasureMode::Exact {
+                dimension,
+                wrap_mode,
+            } => self.content.measure(MeasureMode::Exact {
+                dimension: Dimension::new(
+                    dimension.width.saturating_sub(hmargin),
+                    dimension.height.saturating_sub(vmargin),
+                ),
+                wrap_mode,
+            }),
+        };
+        Measurements::new(
+            Dimension::new(inner.dim.width + hmargin, inner.dim.height + vmargin),
+            MeasurementSpecifics::Child(inner.into()),
+        )
     }
 
     fn layout_with_context(&'_ self, context: LayoutContext) -> BoxedFormattedLayout<'_> {
-        todo!()
+        // Validate, whether it matches
+        if context.measurements.specifics.child().is_none() {
+            return self.layout_strict(context.options);
+        }
+
+        // Creaete LayoutContext for content
+        let child_measurements = context.measurements.specifics.child().unwrap();
+        let x = self.decoration.get_left_margin();
+        let y = self.decoration.get_top_margin(self.title.is_some());
+        let mut child_context =
+            LayoutContext::derive(child_measurements, x, y, &context.options, false);
+        child_context.options.fill_rows = self.decoration.get_right_margin() > 0;
+
+        // Layout
+        FormattedFrame::new(
+            self.content.layout_with_context(child_context),
+            self.title.as_deref(),
+            &self.decoration,
+            context.options,
+        )
+        .into()
     }
 
     fn as_any(&self) -> &dyn Any {
@@ -129,6 +144,7 @@ mod tests {
     use crate::widgets::frame::decoration::TitlePlacement;
     use crate::widgets::frame::*;
     use crate::widgets::{Lines, LinesAlignment};
+    use crate::WrapMode;
 
     #[test]
     fn frame_min_dim() {
@@ -142,6 +158,20 @@ mod tests {
 
         frame.decoration.title_placement = TitlePlacement::default().with_inside(true);
         assert_eq!(frame.min_dim(), Dimension::new(28, 5));
+    }
+
+    #[test]
+    fn frame_measure_min() {
+        let mut frame = Frame::new(
+            FrameDecoration::boxed(),
+            Some("Title".into()),
+            Lines::left("abcdefghijklmnopqrstuvwxyz\n0123456789"),
+        );
+
+        assert_eq!(frame.measure(MeasureMode::min()).dim, Dimension::new(28, 4));
+
+        frame.decoration.title_placement = TitlePlacement::default().with_inside(true);
+        assert_eq!(frame.measure(MeasureMode::min()).dim, Dimension::new(28, 5));
     }
 
     #[test]

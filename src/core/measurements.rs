@@ -5,7 +5,7 @@ use std::cmp::min;
 #[derive(Debug, Clone, Copy)]
 pub enum MeasureMode {
     Min,
-    Pref {
+    PrefWidth {
         max_width: usize,
         wrap_mode: WrapMode,
     },
@@ -25,7 +25,7 @@ impl MeasureMode {
     }
 
     pub const fn pref_width(max_width: usize, wrap_mode: WrapMode) -> Self {
-        Self::Pref {
+        Self::PrefWidth {
             max_width,
             wrap_mode,
         }
@@ -45,7 +45,7 @@ impl MeasureMode {
     pub fn wrap_mode(&self) -> WrapMode {
         match self {
             Self::Min => WrapMode::default(),
-            Self::Pref { wrap_mode, .. } => *wrap_mode,
+            Self::PrefWidth { wrap_mode, .. } => *wrap_mode,
             Self::FixedWidth { wrap_mode, .. } => *wrap_mode,
             Self::Exact { wrap_mode, .. } => *wrap_mode,
         }
@@ -54,7 +54,7 @@ impl MeasureMode {
     pub fn width(&self) -> Option<usize> {
         match self {
             Self::Min => None,
-            Self::Pref { max_width, .. } => Some(*max_width),
+            Self::PrefWidth { max_width, .. } => Some(*max_width),
             Self::FixedWidth { width, .. } => Some(*width),
             Self::Exact { dimension, .. } => Some(dimension.width),
         }
@@ -63,7 +63,7 @@ impl MeasureMode {
     pub fn coerce_width(&self, width: usize) -> usize {
         match self {
             MeasureMode::Min => width,
-            MeasureMode::Pref { max_width, .. } => min(*max_width, width),
+            MeasureMode::PrefWidth { max_width, .. } => min(*max_width, width),
             MeasureMode::FixedWidth { width, .. } => *width,
             MeasureMode::Exact { dimension, .. } => dimension.width,
         }
@@ -86,6 +86,15 @@ impl MeasureMode {
             height: self.coerce_height(dim.height),
         }
     }
+
+    pub fn is_empty(&self) -> bool {
+        match self {
+            MeasureMode::Min => false,
+            MeasureMode::PrefWidth { max_width, .. } => *max_width == 0,
+            MeasureMode::FixedWidth { width, .. } => *width == 0,
+            MeasureMode::Exact { dimension, .. } => dimension.is_empty(),
+        }
+    }
 }
 
 pub struct Measurements {
@@ -98,31 +107,54 @@ impl Measurements {
         Self { dim, specifics }
     }
 
-    pub fn fold_vertically<'a>(iterator: impl Iterator<Item = &'a RcLayout>, mode: MeasureMode) -> Self
-    {
+    pub fn empty() -> Self {
+        Self {
+            dim: Dimension::empty(),
+            specifics: MeasurementSpecifics::None,
+        }
+    }
+
+    pub fn with_specifics(self, specifics: MeasurementSpecifics) -> Self {
+        Self {
+            dim: self.dim,
+            specifics,
+        }
+    }
+    
+    pub fn is_empty(&self) -> bool {
+        self.dim.is_empty()
+    }
+
+    pub fn fold_vertically<'a>(
+        iterator: impl Iterator<Item = &'a RcLayout>,
+        mode: MeasureMode,
+    ) -> Self {
         // First figure out all default measurements, they might differ regarding width
         let children: Vec<(RcLayout, Measurements)> = iterator
             .map(|layout| (layout.clone(), layout.measure(mode)))
             .collect();
-        
+
         // Compute the overall dimension
         let dim = children.iter().fold(Dimension::empty(), |acc, child| {
             acc.vertical_union(child.1.dim)
         });
-        
+
         // And finally adjust the width of all items to the same
-        let children = children.into_iter()
+        let children = children
+            .into_iter()
             .map(|(layout, measurement)| {
-                if measurement.dim.width!=dim.width {
-                    layout.measure(MeasureMode::exact(Dimension::new(dim.width, measurement.dim.height), mode.wrap_mode()))
-                }else {
+                if measurement.dim.width != dim.width {
+                    layout.measure(MeasureMode::exact(
+                        Dimension::new(dim.width, measurement.dim.height),
+                        mode.wrap_mode(),
+                    ))
+                } else {
                     measurement
                 }
             })
             .collect();
         Self::new(dim, MeasurementSpecifics::Children(children))
     }
-    
 }
 
 impl From<Dimension> for Measurements {
@@ -130,7 +162,6 @@ impl From<Dimension> for Measurements {
         Self::new(value, MeasurementSpecifics::None)
     }
 }
-
 
 pub enum MeasurementSpecifics {
     None,
@@ -154,7 +185,7 @@ impl MeasurementSpecifics {
     pub fn child(&self) -> Option<&Measurements> {
         match self {
             MeasurementSpecifics::Child(child) => Some(child.as_ref()),
-            _ => None
+            _ => None,
         }
     }
 }
