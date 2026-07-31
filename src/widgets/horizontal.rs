@@ -3,14 +3,16 @@ use crate::widgets::horizontal::formatted::FormattedRow;
 use crate::widgets::vertical::FormattedVertical;
 use crate::{
     BoxedFormattedLayout, Dimension, Layout, LayoutContext, MeasureMode, MeasurementSpecifics,
-    Measurements, RcLayout, Rect, Row, WrapMode, rc_layout,
+    Measurements, RcLayout, Rect, WrapMode, rc_layout,
 };
 use std::any::Any;
 use std::borrow::Cow;
 use std::cmp::max;
+use crate::widgets::horizontal::row::Row;
 
 pub(crate) mod formatted;
 mod metrics;
+pub(crate) mod old_row;
 pub(crate) mod row;
 
 /// A widget that arranges cells horizontally in a row.

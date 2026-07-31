@@ -3,7 +3,7 @@ use crate::widgets::{Cell, CellDimension, CellWidth, TableColumn};
 use crate::{Dimension, WrapMode};
 use std::cmp::max;
 use std::collections::VecDeque;
-use crate::widgets::horizontal::row::Row;
+use crate::widgets::horizontal::old_row::Row;
 
 /// Metrics for a table, including widths and heights of cells and rows.
 ///

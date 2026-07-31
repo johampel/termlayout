@@ -1,7 +1,8 @@
 use crate::ext::DisplayStr;
 use crate::widgets::{Cell, CellAnchor, Filler};
-use crate::{Dimension, Layout, MeasureMode, MeasurementSpecifics, Measurements, Row, WrapMode};
+use crate::{Dimension, Layout, MeasureMode, MeasurementSpecifics, Measurements, WrapMode};
 use std::cmp::{max, min};
+use crate::widgets::horizontal::row::Row;
 
 pub(crate) struct HorizontalMetrics {
     pub(crate) dim: Dimension,
