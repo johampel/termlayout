@@ -2,14 +2,14 @@ pub(crate) mod dimension;
 mod formatted;
 pub(crate) mod metrics;
 
+use crate::core::measurements::MeasurementSpecifics;
 use crate::widgets::{CellDimension, CellWidth};
 use crate::{
-    BoxedFormattedLayout, Dimension, Layout, LayoutContext, MeasureMode,
-    Measurements, RcLayout, Rect, WrapMode, rc_layout,
+    BoxedFormattedLayout, Dimension, Layout, LayoutContext, MeasureMode, Measurements, RcLayout,
+    Rect, WrapMode, rc_layout,
 };
 use std::any::Any;
 use std::cmp::min;
-use crate::core::measurements::MeasurementSpecifics;
 
 /// A container widget with pre-sized content and positioning control.
 ///
@@ -636,34 +636,33 @@ impl Layout for Cell {
     }
 
     fn layout_with_context(&'_ self, context: LayoutContext) -> BoxedFormattedLayout<'_> {
-        // Validate, whether options fit
-        if context.measurements.specifics.child().is_none() {
-            return self.layout_strict(context.options);
+        let specifics: Result<Measurements, _> = context.measurements.specifics.try_into();
+        match specifics {
+            Ok(child_measurements) => {
+                let metrics = metrics::CellMetrics::new(
+                    &context.options,
+                    child_measurements.dim,
+                    self.clip,
+                    self.anchor,
+                );
+                let child_options = metrics.content_options(
+                    context.options.fill_rows,
+                    self.effective_wrap_mode(context.options.wrap_mode),
+                );
+                let child_context = LayoutContext::new(child_options, child_measurements.clone());
+                let formatted_content = self.content.layout_with_context(child_context);
+
+                // Build final FormattedLayout
+                let cell_options =
+                    metrics.cell_options(context.options.fill_rows, context.options.wrap_mode);
+                Box::new(formatted::FormattedCell::new(
+                    formatted_content,
+                    metrics.padding,
+                    cell_options,
+                ))
+            }
+            Err(_) => self.layout_strict(context.options),
         }
-
-        // Build FormattedLayout for content
-        let child_measurements = context.measurements.specifics.child().unwrap();
-        let metrics = metrics::CellMetrics::new(
-            &context.options,
-            child_measurements.dim,
-            self.clip,
-            self.anchor,
-        );
-        let child_options = metrics.content_options(
-            context.options.fill_rows,
-            self.effective_wrap_mode(context.options.wrap_mode),
-        );
-        let child_context = LayoutContext::new(child_options, child_measurements);
-        let formatted_content = self.content.layout_with_context(child_context);
-
-        // Build final FormattedLayout
-        let cell_options =
-            metrics.cell_options(context.options.fill_rows, context.options.wrap_mode);
-        Box::new(formatted::FormattedCell::new(
-            formatted_content,
-            metrics.padding,
-            cell_options,
-        ))
     }
 
     fn as_any(&self) -> &dyn Any {
@@ -836,8 +835,8 @@ impl CellAnchor {
 
 #[cfg(test)]
 mod tests {
-    use crate::LayoutOptions;
     use super::*;
+    use crate::LayoutOptions;
     use crate::widgets::Lines;
 
     #[test]
@@ -851,7 +850,10 @@ mod tests {
             None,
             CellAnchor::Center,
         );
-        assert_eq!(cell.measure(MeasureMode::pref_width(4, WrapMode::Wrap)).dim, Dimension::new(4, 4));
+        assert_eq!(
+            cell.measure(MeasureMode::pref_width(4, WrapMode::Wrap)).dim,
+            Dimension::new(4, 4)
+        );
 
         let cell = Cell::new(
             content.clone(),
@@ -860,7 +862,11 @@ mod tests {
             None,
             CellAnchor::NorthWest,
         );
-        assert_eq!(cell.measure(MeasureMode::pref_width(20, WrapMode::Wrap)).dim, Dimension::new(10, 2));
+        assert_eq!(
+            cell.measure(MeasureMode::pref_width(20, WrapMode::Wrap))
+                .dim,
+            Dimension::new(20, 2)
+        );
     }
 
     #[test]

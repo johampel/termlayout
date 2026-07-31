@@ -2,8 +2,8 @@ use crate::core::measurements::MeasurementSpecifics;
 use crate::widgets::FrameDecoration;
 use crate::widgets::frame::formatted::FormattedFrame;
 use crate::{
-    BoxedFormattedLayout, Dimension, Layout, LayoutContext, LayoutOptions, MeasureMode,
-    Measurements, RcLayout, Rect, rc_layout,
+    BoxedFormattedLayout, Dimension, Layout, LayoutContext, MeasureMode, Measurements, RcLayout,
+    rc_layout,
 };
 use std::any::Any;
 
@@ -67,7 +67,6 @@ impl Frame {
 }
 
 impl Layout for Frame {
-
     fn measure(&self, mode: MeasureMode) -> Measurements {
         if mode.is_empty() {
             return Measurements::empty()
@@ -109,27 +108,30 @@ impl Layout for Frame {
     }
 
     fn layout_with_context(&'_ self, context: LayoutContext) -> BoxedFormattedLayout<'_> {
-        // Validate, whether it matches
-        if context.measurements.specifics.child().is_none() {
-            return self.layout_strict(context.options);
+        let specifics: Result<Measurements, _> = context.measurements.specifics.try_into();
+        match specifics {
+            Ok(child_measurements) => {
+                let x = self.decoration.get_left_margin();
+                let y = self.decoration.get_top_margin(self.title.is_some());
+                let mut child_context = LayoutContext::new_with_intersection(
+                    &context.options,
+                    x,
+                    y,
+                    child_measurements.clone(),
+                );
+                child_context.options.fill_rows = self.decoration.get_right_margin() > 0;
+
+                // Layout
+                FormattedFrame::new(
+                    self.content.layout_with_context(child_context),
+                    self.title.as_deref(),
+                    &self.decoration,
+                    context.options,
+                )
+                .into()
+            }
+            Err(_) => self.layout_strict(context.options),
         }
-
-        // Creaete LayoutContext for content
-        let child_measurements = context.measurements.specifics.child().unwrap();
-        let x = self.decoration.get_left_margin();
-        let y = self.decoration.get_top_margin(self.title.is_some());
-        let mut child_context =
-            LayoutContext::derive(child_measurements, x, y, &context.options, false);
-        child_context.options.fill_rows = self.decoration.get_right_margin() > 0;
-
-        // Layout
-        FormattedFrame::new(
-            self.content.layout_with_context(child_context),
-            self.title.as_deref(),
-            &self.decoration,
-            context.options,
-        )
-        .into()
     }
 
     fn as_any(&self) -> &dyn Any {
@@ -141,10 +143,10 @@ rc_layout!(Frame);
 
 #[cfg(test)]
 mod tests {
+    use crate::{LayoutOptions, Rect, WrapMode};
     use crate::widgets::frame::decoration::TitlePlacement;
     use crate::widgets::frame::*;
     use crate::widgets::{Lines, LinesAlignment};
-    use crate::WrapMode;
 
     #[test]
     fn frame_min_dim() {

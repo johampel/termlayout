@@ -13,6 +13,7 @@
 #[macro_use]
 pub mod macros;
 mod base_layout_writer;
+mod layout_with_context;
 mod layout_with_options;
 
 pub use crate::box_formatted_layout;
@@ -40,4 +41,5 @@ pub use crate::ext::base_layout_writer::BaseLayoutWriter;
 pub use crate::ext::base_layout_writer::StrLayoutResult;
 pub use crate::ext::base_layout_writer::VoidLayoutResult;
 
+pub use crate::ext::layout_with_context::LayoutWithContext;
 pub use crate::ext::layout_with_options::LayoutWithOptions;

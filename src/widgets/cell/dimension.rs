@@ -129,6 +129,15 @@ impl CellDimension {
             }
         }
     }
+
+    pub fn derive_cell_measure_mode(&self, mode: MeasureMode) -> MeasureMode {
+        match self {
+            CellDimension::Fixed { cell, .. } => {
+                MeasureMode::fixed_width(cell.width, mode.wrap_mode())
+            }
+            CellDimension::Declarative(width) => width.derive_cell_measure_mode(mode),
+        }
+    }
 }
 
 impl From<Dimension> for CellDimension {
@@ -271,6 +280,28 @@ impl CellWidth {
             MeasurementSpecifics::Child(Box::new(inner)),
         )
     }
+
+    pub fn derive_cell_measure_mode(&self, mode: MeasureMode) -> MeasureMode {
+        match self {
+            CellWidth::Minimal => MeasureMode::Min,
+            CellWidth::Fixed(w) => MeasureMode::FixedWidth {
+                width: *w,
+                wrap_mode: mode.wrap_mode(),
+            },
+            CellWidth::Preferred(w) => MeasureMode::pref_width(*w, mode.wrap_mode()),
+            CellWidth::Proportional(p) => match mode.width() {
+                Some(w) => {
+                    let w = (w as f32 * p) as usize;
+                    MeasureMode::fixed_width(w, mode.wrap_mode())
+                }
+                None => MeasureMode::Min,
+            },
+            CellWidth::Fill => match mode.width() {
+                Some(w) => MeasureMode::fixed_width(w, mode.wrap_mode()),
+                None => MeasureMode::Min,
+            },
+        }
+    }
 }
 
 #[cfg(test)]
@@ -279,7 +310,7 @@ mod tests {
     use crate::{Dimension, MeasureMode, RcLayout, WrapMode};
 
     #[test]
-    fn cell_width_measure_minimal() {
+    fn  cell_width_measure_minimal() {
         let cell_content: RcLayout = Paragraph::left("abc def ghijk").into();
 
         // Min
@@ -289,7 +320,7 @@ mod tests {
 
         // pref
         let result = CellWidth::Minimal.measure(&cell_content, MeasureMode::pref_width(4, WrapMode::default()));
-        assert_eq!(result.dim, Dimension::new(4, 3));
+        assert_eq!(result.dim, Dimension::new(5, 3));
         assert_eq!(result.specifics.child().unwrap().dim, Dimension::new(5, 3));
 
         let result = CellWidth::Minimal.measure(&cell_content, MeasureMode::pref_width(5, WrapMode::default()));
@@ -297,7 +328,7 @@ mod tests {
         assert_eq!(result.specifics.child().unwrap().dim, Dimension::new(5, 3));
 
         let result = CellWidth::Minimal.measure(&cell_content, MeasureMode::pref_width(8, WrapMode::default()));
-        assert_eq!(result.dim, Dimension::new(5, 3));
+        assert_eq!(result.dim, Dimension::new(8, 3));
         assert_eq!(result.specifics.child().unwrap().dim, Dimension::new(5, 3));
 
         // fixed_width
@@ -338,11 +369,11 @@ mod tests {
 
         // pref
         let result = CellWidth::Fixed(8).measure(&cell_content, MeasureMode::pref_width(6, WrapMode::default()));
-        assert_eq!(result.dim, Dimension::new(6, 2));
+        assert_eq!(result.dim, Dimension::new(8, 2));
         assert_eq!(result.specifics.child().unwrap().dim, Dimension::new(8, 2));
 
         let result = CellWidth::Fixed(8).measure(&cell_content, MeasureMode::pref_width(7, WrapMode::default()));
-        assert_eq!(result.dim, Dimension::new(7, 2));
+        assert_eq!(result.dim, Dimension::new(8, 2));
         assert_eq!(result.specifics.child().unwrap().dim, Dimension::new(8, 2));
 
         let result = CellWidth::Fixed(8).measure(&cell_content, MeasureMode::pref_width(8, WrapMode::default()));
@@ -388,7 +419,7 @@ mod tests {
 
         // pref
         let result = CellWidth::Preferred(8).measure(&cell_content, MeasureMode::pref_width(6, WrapMode::default()));
-        assert_eq!(result.dim, Dimension::new(6, 2));
+        assert_eq!(result.dim, Dimension::new(7, 2));
         assert_eq!(result.specifics.child().unwrap().dim, Dimension::new(7, 2));
 
         let result = CellWidth::Preferred(8).measure(&cell_content, MeasureMode::pref_width(7, WrapMode::default()));
@@ -396,7 +427,7 @@ mod tests {
         assert_eq!(result.specifics.child().unwrap().dim, Dimension::new(7, 2));
 
         let result = CellWidth::Preferred(8).measure(&cell_content, MeasureMode::pref_width(8, WrapMode::default()));
-        assert_eq!(result.dim, Dimension::new(7, 2));
+        assert_eq!(result.dim, Dimension::new(8, 2));
         assert_eq!(result.specifics.child().unwrap().dim, Dimension::new(7, 2));
 
         // fixed_width
@@ -438,7 +469,7 @@ mod tests {
 
         // pref
         let result = CellWidth::Fill.measure(&cell_content, MeasureMode::pref_width(6, WrapMode::default()));
-        assert_eq!(result.dim, Dimension::new(5, 3));
+        assert_eq!(result.dim, Dimension::new(6, 3));
         assert_eq!(result.specifics.child().unwrap().dim, Dimension::new(5, 3));
 
         let result = CellWidth::Fill.measure(&cell_content, MeasureMode::pref_width(7, WrapMode::default()));
@@ -446,7 +477,7 @@ mod tests {
         assert_eq!(result.specifics.child().unwrap().dim, Dimension::new(7, 2));
 
         let result = CellWidth::Fill.measure(&cell_content, MeasureMode::pref_width(8, WrapMode::default()));
-        assert_eq!(result.dim, Dimension::new(7, 2));
+        assert_eq!(result.dim, Dimension::new(8, 2));
         assert_eq!(result.specifics.child().unwrap().dim, Dimension::new(7, 2));
 
         // fixed_width
@@ -487,7 +518,7 @@ mod tests {
 
         // pref
         let result = CellWidth::Proportional(1.5).measure(&cell_content, MeasureMode::pref_width(6, WrapMode::default()));
-        assert_eq!(result.dim, Dimension::new(6, 2));
+        assert_eq!(result.dim, Dimension::new(7, 2));
         assert_eq!(result.specifics.child().unwrap().dim, Dimension::new(7, 2));
 
         let result = CellWidth::Proportional(1.5).measure(&cell_content, MeasureMode::pref_width(7, WrapMode::default()));
@@ -495,7 +526,7 @@ mod tests {
         assert_eq!(result.specifics.child().unwrap().dim, Dimension::new(7, 2));
 
         let result = CellWidth::Proportional(1.5).measure(&cell_content, MeasureMode::pref_width(8, WrapMode::default()));
-        assert_eq!(result.dim, Dimension::new(7, 2));
+        assert_eq!(result.dim, Dimension::new(8, 2));
         assert_eq!(result.specifics.child().unwrap().dim, Dimension::new(7, 2));
 
         // fixed_width

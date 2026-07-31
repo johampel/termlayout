@@ -1,26 +1,83 @@
 use crate::{Dimension, Measurements, Rect};
 
-pub struct  LayoutContext<'a>  {
+/// Provides contextual information for layout calculations, including options and measurements.
+///
+/// Typically, when performing a layout, the caller passes [`LayoutOptions`] or parts
+/// of it to the layout operation, which first calls [`measure`](crate::Layout::measure) to obtain
+/// the [`Measurements`] of the object to layout. This context is simply the union of the
+/// [`LayoutOptions`] and the [`Measurements`].
+/// 
+/// Instances of this type are normally created by the crate itself, it is quite uncommon to create
+/// instances in pure client code, since the caller is responsible that the `options` and 
+/// `measuremnts` fit somehow. 
+#[derive(Clone)]
+pub struct LayoutContext {
+    /// The [`LayoutOptions`]
     pub options: LayoutOptions,
-    pub measurements: &'a Measurements,
+    /// The [`Measurements`]
+    pub measurements: Measurements,
 }
 
-impl<'a> LayoutContext<'a> {
-    pub fn new(options: LayoutOptions, measurements: &'a Measurements) -> Self {
+impl LayoutContext {
+
+    /// Creates a new instance for the given `options` and `measurments`.
+    ///
+    /// # Parameters
+    /// - `options`:  The [`LayoutOptions`]
+    /// - `measurements`: The [`Measurements`]
+    ///
+    /// # Returns
+    /// A new [`LayoutContext`]
+    pub fn new(options: LayoutOptions, measurements: Measurements) -> Self {
         Self {
             options,
             measurements,
         }
     }
 
-    pub fn derive(measurements: &'a Measurements, x: usize, y: usize, options: &LayoutOptions, adjust_fill_rows: bool) -> Self
-    {
-        Self::new(options.intersect(Rect::new(x, y, measurements.dim), adjust_fill_rows), measurements)
+    /// [Intersects](LayoutOptions::intersect) `options` with the rect formed by the dimension of
+    /// the `measurements`, `x`, and `y` and creates an according `LayoutContext`.
+    ///
+    /// # Parameters
+    /// - `options`: The [`LayoutOptions`]
+    /// - x: The X coordinate of the rect
+    /// - y: The Y coordinate of the rect
+    /// - `measurements`: The [`Measurements`]
+    ///
+    /// # Returns
+    /// A new [`LayoutContext`]
+    ///
+    /// # Example
+    /// ```rust
+    /// use termlayout::*;
+    ///
+    /// let options = LayoutOptions::default()
+    ///     .with_dim(Dimension::new(11, 9))
+    ///     .with_clip(Some(Rect::new(2, 0, Dimension::new(8, 6))));
+    /// let measurements = Measurements::new(Dimension::new(5, 5), MeasurementSpecifics::None);
+    ///
+    /// let result = LayoutContext::new_with_intersection(&options, 1, 1, measurements.clone());
+    /// assert_eq!(result.options, LayoutOptions::new(
+    ///     measurements.dim,
+    ///     false,
+    ///     options.wrap_mode,
+    ///     Some(Rect::new(1, 0, Dimension::new(4, 5)))
+    /// ));
+    /// ```
+    pub fn new_with_intersection(
+        options: &LayoutOptions,
+        x: usize,
+        y: usize,
+        measurements: Measurements,
+    ) -> Self {
+        Self::new(
+            options.intersect(Rect::new(x, y, measurements.dim), false),
+            measurements,
+        )
     }
-
 }
 
-impl<'a> Into<LayoutOptions> for LayoutContext<'a> {
+impl Into<LayoutOptions> for LayoutContext {
     fn into(self) -> LayoutOptions {
         self.options
     }
@@ -197,7 +254,7 @@ impl LayoutOptions {
     /// # Returns
     /// A new [`LayoutOptions`] instance representing the intersection.
     ///
-    /// # Examples
+    /// # Example
     /// ```rust
     /// use termlayout::*;
     ///
@@ -320,7 +377,7 @@ impl LayoutOptions {
     ///
     /// let result = options.with_normalized_clip();
     /// assert_eq!(result, LayoutOptions::new(
-    ///     Dimension::new(8, 9),
+    ///     Dimension::new(8, 6),
     ///     false,
     ///     WrapMode::default(),
     ///     Some(Rect::new(0, 0, Dimension::new(8, 6)))
@@ -330,7 +387,7 @@ impl LayoutOptions {
     pub fn with_normalized_clip(&self) -> Self {
         let visible = self.visible_rect();
         LayoutOptions::new(
-            Dimension::new(visible.dim.width, self.dim.height),
+            visible.dim,
             self.fill_rows,
             self.wrap_mode,
             Some(Rect::new(0, 0, visible.dim)),

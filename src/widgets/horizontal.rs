@@ -1,11 +1,16 @@
 use crate::widgets::Cell;
-use crate::widgets::horizontal::row::Row;
+use crate::widgets::horizontal::formatted::FormattedRow;
 use crate::widgets::vertical::FormattedVertical;
-use crate::{rc_layout, BoxedFormattedLayout, Dimension, Layout, LayoutOptions, MeasureMode, RcLayout, Rect, WrapMode, Measurements, LayoutContext};
+use crate::{
+    BoxedFormattedLayout, Dimension, Layout, LayoutContext, MeasureMode, MeasurementSpecifics,
+    Measurements, RcLayout, Rect, Row, WrapMode, rc_layout,
+};
 use std::any::Any;
 use std::borrow::Cow;
 use std::cmp::max;
 
+pub(crate) mod formatted;
+mod metrics;
 pub(crate) mod row;
 
 /// A widget that arranges cells horizontally in a row.
@@ -164,61 +169,74 @@ where
 }
 
 impl Layout for Horizontal {
-    fn pref_dim(&self, max_width: usize, wrap_mode: WrapMode) -> Dimension {
-        if self.content.is_empty() || max_width == 0 {
-            return Dimension::empty();
-        }
-
-        let cells = self.cells();
-        let rows = Row::from_cells(
-            Self::apply_fixed_dims(&cells, Some(max_width), wrap_mode),
-            max_width,
-            wrap_mode,
-        );
-        rows.iter()
-            .fold(Dimension::empty(), |acc, row| acc.vertical_union(row.dim))
-    }
-
-    fn min_dim(&self) -> Dimension {
-        if self.content.is_empty() {
-            return Dimension::empty();
-        }
-        let cells = self.cells();
-        Self::compute_fixed_dims(cells.as_ref(), None, WrapMode::default())
-            .iter()
-            .fold(Dimension::empty(), |acc, dim| acc.horizontal_union(dim.0))
-    }
-
+    // fn pref_dim(&self, max_width: usize, wrap_mode: WrapMode) -> Dimension {
+    //     if self.content.is_empty() || max_width == 0 {
+    //         return Dimension::empty();
+    //     }
+    //
+    //     let cells = self.cells();
+    //     let rows = Row::from_cells(
+    //         Self::apply_fixed_dims(&cells, Some(max_width), wrap_mode),
+    //         max_width,
+    //         wrap_mode,
+    //     );
+    //     rows.iter()
+    //         .fold(Dimension::empty(), |acc, row| acc.vertical_union(row.dim))
+    // }
+    //
     fn measure(&self, mode: MeasureMode) -> Measurements {
-        todo!()
+        let metrics = metrics::HorizontalMetrics::new(self.cells().as_ref(), mode);
+        Measurements::new(metrics.dim, MeasurementSpecifics::Rows(metrics.rows))
     }
 
-    fn layout_strict(&'_ self, options: LayoutOptions) -> BoxedFormattedLayout<'_> {
-        let cells = self.cells();
-        let rows = Row::from_cells(
-            Self::apply_fixed_dims(&cells, Some(options.dim.width), options.wrap_mode),
-            options.dim.width,
-            options.wrap_mode,
-        );
-
-        if rows.len() == 1 {
-            return rows[0].layout(options);
-        }
-
-        let mut offset = 0;
-        let formatted = rows
-            .into_iter()
-            .map(|row| {
-                let row_options = options.intersect(Rect::new(0, offset, row.dim), false);
-                offset += row.dim.height;
-                row.layout(row_options)
-            })
-            .collect();
-        FormattedVertical::new(formatted, options.with_normalized_clip()).into()
-    }
+    // fn layout_strict(&'_ self, options: LayoutOptions) -> BoxedFormattedLayout<'_> {
+    //     let cells = self.cells();
+    //     let rows = Row::from_cells(
+    //         Self::apply_fixed_dims(&cells, Some(options.dim.width), options.wrap_mode),
+    //         options.dim.width,
+    //         options.wrap_mode,
+    //     );
+    //
+    //     if rows.len() == 1 {
+    //         return rows[0].layout(options);
+    //     }
+    //
+    //     let mut offset = 0;
+    //     let formatted = rows
+    //         .into_iter()
+    //         .map(|row| {
+    //             let row_options = options.intersect(Rect::new(0, offset, row.dim), false);
+    //             offset += row.dim.height;
+    //             row.layout(row_options)
+    //         })
+    //         .collect();
+    //     FormattedVertical::new(formatted, options.with_normalized_clip()).into()
+    //     todo!()
+    // }
 
     fn layout_with_context(&'_ self, context: LayoutContext) -> BoxedFormattedLayout<'_> {
-        todo!()
+        let mut specifics: Result<Vec<Row>, _> = context.measurements.specifics.try_into();
+        match specifics {
+            Ok(mut rows) => {
+                let mut y = 0;
+                let children = rows
+                    .iter_mut()
+                    .map(|row| {
+                        row.fixiate_cell_dims();
+                        let row_options =
+                            context.options.intersect(Rect::new(0, y, row.dim), false);
+                        y += row.dim.height;
+                        FormattedRow::new(
+                            row.cells.iter().map(|e| e.clone()).collect::<Vec<_>>(),
+                            row_options,
+                        )
+                        .into()
+                    })
+                    .collect();
+                FormattedVertical::new(children, context.options.with_normalized_clip()).into()
+            }
+            Err(_) => self.layout_strict(context.options),
+        }
     }
 
     fn as_any(&self) -> &dyn Any {
@@ -310,7 +328,7 @@ mod tests {
                 "   ghijkl    | 456          |                          KLMNO\n",
                 "   mnopqr    | 789          |                          PQRST\n",
                 "   stuvwx    |              |                          UVWXY\n",
-                "                              \n"
+                "             |              | \n"
             )
         );
     }
@@ -328,7 +346,7 @@ mod tests {
                 "mnopqr | 456 | KLMNO\n",
                 "stuvwx | 789 | PQRST\n",
                 "       |     | UVWXY\n",
-                "               \n"
+                "       |     | \n"
             )
         );
 
@@ -341,7 +359,7 @@ mod tests {
                 "mnopqr | 456 | KLMNO     \n",
                 "stuvwx | 789 | PQRST     \n",
                 "       |     | UVWXY     \n",
-                "                         \n"
+                "       |     |           \n"
             )
         );
     }
@@ -362,7 +380,7 @@ mod tests {
                 "nopqr | 456 | K\n",
                 "tuvwx | 789 | P\n",
                 "      |     | U\n",
-                "              \n"
+                "      |     | \n"
             )
         );
 
@@ -378,7 +396,7 @@ mod tests {
                 "nopqr | 456 | K\n",
                 "tuvwx | 789 | P\n",
                 "      |     | U\n",
-                "               \n"
+                "      |     |  \n"
             )
         );
     }
@@ -401,7 +419,7 @@ mod tests {
                 "mnopqr | 456 | KL…\n", //
                 "stuvwx | 789 | PQ…\n", //
                 "       |     | UV…\n", //
-                "                 \n"   //
+                "       |     |   …\n"  //
             )
         );
 
@@ -419,7 +437,7 @@ mod tests {
                 "mnopqr | 456 | KL…\n", //
                 "stuvwx | 789 | PQ…\n", //
                 "       |     | UV…\n", //
-                "                  \n"  //
+                "       |     |   …\n"  //
             )
         );
     }
@@ -440,7 +458,7 @@ mod tests {
                 "nopqr | 456 | K\n", //
                 "tuvwx | 789 | P\n", //
                 "      |     | U\n", //
-                "               \n"  //
+                "      |     |  \n"  //
             )
         );
 
@@ -456,7 +474,7 @@ mod tests {
                 "nopqr | 456 | K\n", //
                 "tuvwx | 789 | P\n", //
                 "      |     | U\n", //
-                "               \n"  //
+                "      |     |  \n"  //
             )
         );
     }
@@ -478,7 +496,7 @@ mod tests {
                 " KLMNO\n",
                 " PQRST\n",
                 " UVWXY\n",
-                "\n"
+                " \n"
             )
         );
 

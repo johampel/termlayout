@@ -113,22 +113,21 @@ impl Layout for Vertical {
     }
 
     fn layout_with_context(&'_ self, context: LayoutContext) -> BoxedFormattedLayout<'_> {
-        // Validate, whether options fit
-        if context.measurements.specifics.children().is_none() {
-            return self.layout_strict(context.options);
+        let specifics: Result<Vec<Measurements>, _> = context.measurements.specifics.try_into();
+        match specifics {
+            Ok(child_measurements) => {
+                let mut y = 0;
+                let children = self.content.iter().zip(child_measurements.iter())
+                    .map(|(l, m)| {
+                        let ctxt = LayoutContext::new_with_intersection(&context.options, 0, y, m.clone());
+                        y += ctxt.options.dim.height;
+                        l.layout_with_context(ctxt)
+                    })
+                    .collect();
+                FormattedVertical::new(children, context.options).into()
+            }
+            Err(_) => return self.layout_strict(context.options),
         }
-
-        // Go on with our stuff
-        let child_measurements = context.measurements.specifics.children().unwrap();
-        let mut y = 0;
-        let children = self.content.iter().zip(child_measurements.iter())
-            .map(|(l, m)| {
-                let ctxt = LayoutContext::derive(m, 0,y, &context.options, false);
-                y += ctxt.options.dim.height;
-                l.layout_with_context(ctxt)
-            })
-            .collect();
-        FormattedVertical::new(children, context.options).into()
     }
 
     fn as_any(&self) -> &dyn Any {

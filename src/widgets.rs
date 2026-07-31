@@ -31,7 +31,6 @@ pub use cell::dimension::CellWidth;
 pub use filler::FillMode;
 pub use filler::Filler;
 pub use horizontal::Horizontal;
-pub use horizontal::row::Row;
 pub use lines::Lines;
 pub use lines::LinesAlignment;
 

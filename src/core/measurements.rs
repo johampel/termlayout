@@ -1,6 +1,9 @@
+use crate::widgets::{Cell, CellAnchor, CellDimension};
 use crate::{Dimension, RcLayout, WrapMode};
 use std::any::Any;
-use std::cmp::min;
+use std::cmp::max;
+use std::collections::VecDeque;
+use std::rc::Rc;
 
 #[derive(Debug, Clone, Copy)]
 pub enum MeasureMode {
@@ -63,7 +66,7 @@ impl MeasureMode {
     pub fn coerce_width(&self, width: usize) -> usize {
         match self {
             MeasureMode::Min => width,
-            MeasureMode::PrefWidth { max_width, .. } => min(*max_width, width),
+            MeasureMode::PrefWidth { max_width, .. } => max(*max_width, width),
             MeasureMode::FixedWidth { width, .. } => *width,
             MeasureMode::Exact { dimension, .. } => dimension.width,
         }
@@ -97,6 +100,7 @@ impl MeasureMode {
     }
 }
 
+#[derive(Clone)]
 pub struct Measurements {
     pub dim: Dimension,
     pub specifics: MeasurementSpecifics,
@@ -120,7 +124,23 @@ impl Measurements {
             specifics,
         }
     }
-    
+
+    pub fn split_horizontal(self, width: usize) -> (Self, Self) {
+        let (left, right) = self.dim.split_horizontal(width);
+        (
+            Self::new(left, self.specifics.clone()),
+            Self::new(right, self.specifics),
+        )
+    }
+
+    pub fn split_vertical(self, height: usize) -> (Self, Self) {
+        let (top, bottom) = self.dim.split_vertical(height);
+        (
+            Self::new(top, self.specifics.clone()),
+            Self::new(bottom, self.specifics),
+        )
+    }
+
     pub fn is_empty(&self) -> bool {
         self.dim.is_empty()
     }
@@ -163,11 +183,13 @@ impl From<Dimension> for Measurements {
     }
 }
 
+#[derive(Clone)]
 pub enum MeasurementSpecifics {
     None,
     Children(Vec<Measurements>),
     Child(Box<Measurements>),
-    Custom(Box<dyn Any>),
+    Rows(Vec<Row>),
+    Custom(Rc<dyn Any>),
 }
 
 impl MeasurementSpecifics {
@@ -187,5 +209,122 @@ impl MeasurementSpecifics {
             MeasurementSpecifics::Child(child) => Some(child.as_ref()),
             _ => None,
         }
+    }
+
+    pub fn rows(&self) -> Option<&[Row]> {
+        match self {
+            MeasurementSpecifics::Rows(rows) => Some(rows),
+            _ => None,
+        }
+    }
+}
+
+impl TryFrom<MeasurementSpecifics> for Vec<Row> {
+    type Error = &'static str;
+
+    fn try_from(value: MeasurementSpecifics) -> Result<Self, Self::Error> {
+        match value {
+            MeasurementSpecifics::Rows(rows) => Ok(rows),
+            _ => Err("MeasurementSpecifics is not Rows"),
+        }
+    }
+}
+
+impl TryFrom<MeasurementSpecifics> for Measurements {
+    type Error = &'static str;
+
+    fn try_from(value: MeasurementSpecifics) -> Result<Self, Self::Error> {
+        match value {
+            MeasurementSpecifics::Child(child) => Ok(*child),
+            _ => Err("MeasurementSpecifics is not Child"),
+        }
+    }
+}
+
+impl TryFrom<MeasurementSpecifics> for Vec<Measurements> {
+    type Error = &'static str;
+
+    fn try_from(value: MeasurementSpecifics) -> Result<Self, Self::Error> {
+        match value {
+            MeasurementSpecifics::Children(children) => Ok(children),
+            _ => Err("MeasurementSpecifics is not Children"),
+        }
+    }
+}
+
+#[derive(Clone)]
+pub struct Row {
+    pub dim: Dimension,
+    pub cells: VecDeque<(Cell, Measurements)>,
+}
+
+impl Row {
+    fn new(dim: Dimension, cells: VecDeque<(Cell, Measurements)>) -> Self {
+        Self { dim, cells }
+    }
+
+    pub fn empty() -> Self {
+        Self::new(Dimension::new(0, 0), VecDeque::new())
+    }
+
+    pub fn push_back(&mut self, cell: Cell, measurement: Measurements) {
+        self.dim = self.dim.horizontal_union(measurement.dim);
+        self.cells.push_back((cell, measurement));
+    }
+
+    pub fn push_front(&mut self, cell: Cell, measurement: Measurements) {
+        self.dim = self.dim.horizontal_union(measurement.dim);
+        self.cells.push_front((cell, measurement));
+    }
+
+    pub fn pop_back(&mut self) -> Option<(Cell, Measurements)> {
+        let result = self.cells.pop_back();
+        if result.is_some() {
+            self.update_dim();
+        }
+        result
+    }
+
+    pub fn pop_front(&mut self) -> Option<(Cell, Measurements)> {
+        let result = self.cells.pop_front();
+        if result.is_some() {
+            self.update_dim();
+        }
+        result
+    }
+
+    fn update_dim(&mut self) {
+        self.dim = self
+            .cells
+            .iter()
+            .map(|(_, m)| m.dim)
+            .fold(Dimension::empty(), |a, b| a.horizontal_union(b));
+    }
+
+    pub fn fixiate_cell_dims(&mut self) {
+        self.cells.iter_mut().for_each(|(c, m)| {
+            m.dim.height = self.dim.height;
+            let mut content_dim = m.specifics.child().map(|m| m.dim).unwrap_or(m.dim);
+            if matches!(c.anchor, CellAnchor::Fill) {
+                content_dim = Dimension::new(
+                    max(content_dim.width, m.dim.width),
+                    max(content_dim.height, m.dim.height),
+                );
+                m.specifics = MeasurementSpecifics::Child(Box::new(content_dim.into()));
+            }
+            c.dim = CellDimension::Fixed {
+                cell: m.dim,
+                content: content_dim,
+            }
+        })
+    }
+    pub fn is_empty(&self) -> bool {
+        self.cells.is_empty()
+    }
+}
+
+impl From<Row> for VecDeque<(Cell, Measurements)> {
+    fn from(value: Row) -> Self {
+        value.cells
     }
 }

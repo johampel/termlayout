@@ -12,6 +12,7 @@ use std::fmt::Write;
 /// `Cells` that fit into a single horizontal row. Typically, instances of this type are created
 /// via the [`Row::from_cells`] function which returns a vector of `Row`s (the vector contains only
 /// one element in case all cells fit into a single row).
+#[deprecated]
 pub struct Row {
     /// The list of [`Cell`]s that belong to the row.
     pub(crate) cells: Vec<Cell>,
