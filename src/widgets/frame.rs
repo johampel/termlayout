@@ -149,20 +149,6 @@ mod tests {
     use crate::widgets::{Lines, LinesAlignment};
 
     #[test]
-    fn frame_min_dim() {
-        let mut frame = Frame::new(
-            FrameDecoration::boxed(),
-            Some("Title".into()),
-            Lines::left("abcdefghijklmnopqrstuvwxyz\n0123456789"),
-        );
-
-        assert_eq!(frame.min_dim(), Dimension::new(28, 4));
-
-        frame.decoration.title_placement = TitlePlacement::default().with_inside(true);
-        assert_eq!(frame.min_dim(), Dimension::new(28, 5));
-    }
-
-    #[test]
     fn frame_measure_min() {
         let mut frame = Frame::new(
             FrameDecoration::boxed(),
@@ -174,6 +160,21 @@ mod tests {
 
         frame.decoration.title_placement = TitlePlacement::default().with_inside(true);
         assert_eq!(frame.measure(MeasureMode::min()).dim, Dimension::new(28, 5));
+    }
+    #[test]
+    fn frame_measure_pref_width() {
+        let mut frame = Frame::new(
+            FrameDecoration::boxed(),
+            Some("Title".into()),
+            Lines::left("abcdefghijklmnopqrstuvwxyz\n0123456789"),
+        );
+
+        assert_eq!(frame.measure(MeasureMode::pref_width(30, WrapMode::Wrap)).dim, Dimension::new(28, 4));
+        assert_eq!(frame.measure(MeasureMode::pref_width(15, WrapMode::Wrap)).dim, Dimension::new(15, 5));
+
+        frame.decoration.title_placement = TitlePlacement::default().with_inside(true);
+        assert_eq!(frame.measure(MeasureMode::pref_width(30, WrapMode::Wrap)).dim, Dimension::new(28, 5));
+        assert_eq!(frame.measure(MeasureMode::pref_width(15, WrapMode::Wrap)).dim, Dimension::new(15, 6));
     }
 
     #[test]

@@ -1,9 +1,11 @@
 use crate::widgets::table::decoration::DecoratedTable;
 use crate::widgets::table::metrics::TableMetrics;
-use crate::widgets::vertical::FormattedVertical;
 use crate::widgets::{CellAnchor, CellWidth, TableDecoration};
-use crate::{rc_layout, BoxedFormattedLayout, Dimension, Layout, LayoutOptions, MeasureMode, RcLayout, Rect, WrapMode, Measurements, LayoutContext};
+use crate::{rc_layout, BoxedFormattedLayout, Dimension, Layout, LayoutContext, LayoutOptions, MeasureMode, Measurements, RcLayout, WrapMode, MeasurementSpecifics, Rect};
 use std::any::Any;
+use crate::ext::Row;
+use crate::widgets::horizontal::row::FormattedRow;
+use crate::widgets::vertical::FormattedVertical;
 
 pub(crate) mod decoration;
 mod metrics;
@@ -67,57 +69,22 @@ impl Table {
 }
 
 impl Layout for Table {
-    fn pref_dim(&self, max_width: usize, wrap_mode: WrapMode) -> Dimension {
-        let table = DecoratedTable::new(self);
-        let metrics = TableMetrics::new(&table, Some(max_width), wrap_mode);
-        let dim = metrics.dim();
-        if dim.width <= max_width {
-            return dim;
-        }
-
-        (0..table.rows)
-            .map(|r| {
-                metrics
-                    .row(r, max_width, wrap_mode)
-                    .iter()
-                    .fold(Dimension::empty(), |acc, row| acc.vertical_union(row.dim))
-            })
-            .fold(Dimension::empty(), |acc, row| acc.vertical_union(row))
-    }
-
-    fn min_dim(&self) -> Dimension {
-        let table = DecoratedTable::new(self);
-        let metrics = TableMetrics::new(&table, None, WrapMode::Wrap);
-        metrics.dim()
-    }
-
     fn measure(&self, mode: MeasureMode) -> Measurements {
-        todo!()
-    }
-
-    fn layout_strict(&'_ self, options: LayoutOptions) -> BoxedFormattedLayout<'_> {
         let table = DecoratedTable::new(self);
-        let metrics = TableMetrics::new(&table, Some(options.dim.width), options.wrap_mode);
-        let rows = metrics.all_rows(options.dim.width, options.wrap_mode);
-
-        if rows.len() == 1 {
-            return rows[0].layout(options);
-        }
-
-        let mut offset = 0;
-        let formatted = rows
-            .into_iter()
-            .map(|row| {
-                let row_options = options.intersect(Rect::new(0, offset, row.dim), false);
-                offset += row.dim.height;
-                row.layout(row_options)
-            })
-            .collect();
-        FormattedVertical::new(formatted, options.with_normalized_clip()).into()
+        let metrics = TableMetrics::new(&table, mode);
+        let rows = metrics.all_rows(mode);
+        let dim = rows.iter()
+            .map(|row| row.dim)
+            .fold(Dimension::empty(), |acc, dim| acc.vertical_union(dim));
+        Measurements::new(dim, MeasurementSpecifics::Rows(rows))
     }
 
     fn layout_with_context(&'_ self, context: LayoutContext) -> BoxedFormattedLayout<'_> {
-        todo!()
+        if context.measurements.specifics.rows().is_some() {
+            Row::layout(context).unwrap()
+        } else {
+            self.layout_strict(context.options)
+        }
     }
 
     fn as_any(&self) -> &dyn Any {
@@ -247,6 +214,7 @@ impl Default for TableColumn {
 
 #[cfg(test)]
 mod tests {
+    use crate::{Dimension, Rect};
     use crate::widgets::table::*;
     use crate::widgets::{Filler, Lines};
 
@@ -417,7 +385,7 @@ mod tests {
             result,
             concat!(
                 "┌─────────────┬──────────┬───────…\n",
-                "│    Col 1    │  Col 2   │    Col…\n",
+                "│    Col 1    │  Col 2   │ Col 3 …\n",
                 "├─────────────┼──────────┼───────…\n",
                 "│abcdefghijklm│0101010101│ABCDEFG…\n",
                 "│nopqrstuvwxyz│0101010101│NOPQRST…\n",
@@ -432,14 +400,14 @@ mod tests {
         let formatted = table.layout_strict(LayoutOptions::new(
             Dimension::new(34, 8),
             true,
-            WrapMode::default(),
+            WrapMode::default_truncate(),
             Some(Rect::new(2, 1, Dimension::new(30, 5))),
         ));
         let result = format!("{formatted}");
         assert_eq!(
             result,
             concat!(
-                "   Col 1    │  Col 2   │    Co\n",
+                "   Col 1    │  Col 2   │ Col 3\n",
                 "────────────┼──────────┼──────\n",
                 "bcdefghijklm│0101010101│ABCDEF\n",
                 "opqrstuvwxyz│0101010101│NOPQRS\n",

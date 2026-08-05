@@ -1,57 +1,69 @@
 use crate::ext::DisplayStr;
+use crate::widgets::horizontal::row::Row;
 use crate::widgets::{Cell, CellAnchor, Filler};
 use crate::{Dimension, Layout, MeasureMode, MeasurementSpecifics, Measurements, WrapMode};
 use std::cmp::{max, min};
-use crate::widgets::horizontal::row::Row;
 
-pub(crate) struct HorizontalMetrics {
-    pub(crate) dim: Dimension,
-    pub(crate) rows: Vec<Row>,
+pub struct HorizontalMetrics {
+    pub dim: Dimension,
+    pub rows: Vec<Row>,
 }
 
 impl HorizontalMetrics {
-    pub(crate) fn new(cells: &[Cell], mode: MeasureMode) -> Self {
-        let height = mode.height();
+    pub fn from_cells(cells: &[Cell], mode: MeasureMode) -> Self {
+        let max_height = mode.height();
         // Build a row containing all cells
         let measurements = Self::measure_cells(cells, mode);
         let mut row = Row::empty();
         for (c, m) in cells.iter().zip(measurements.iter()) {
             row.push_back(c.clone(), m.clone());
         }
-        if let Some(height) = height {
+        if let Some(height) = max_height {
             row.dim.height = height;
         }
 
-        match mode {
-            MeasureMode::Min => Self {
+        Self::from_row(
+            row,
+            mode.wrap_mode(),
+            mode.coerce_width(usize::MAX),
+            max_height,
+            true,
+        )
+    }
+
+    pub fn from_row(
+        row: Row,
+        wrap_mode: WrapMode,
+        max_width: usize,
+        max_height: Option<usize>,
+        fill_height: bool,
+    ) -> Self {
+        if max_width >= row.dim.width {
+            return Self {
                 dim: row.dim,
                 rows: vec![row],
-            },
-            _ => {
-                let max_width = mode.width().unwrap_or_default();
-                if max_width >= row.dim.width {
-                    return Self {
-                        dim: row.dim,
-                        rows: vec![row],
-                    };
-                } else if max_width == 0 {
-                    return Self {
-                        dim: Dimension::new(0, 0),
-                        rows: vec![],
-                    };
-                }
-                match mode.wrap_mode() {
-                    WrapMode::Truncate(indicator) => {
-                        Self::new_with_truncation(row, max_width, height, indicator)
-                    }
-                    WrapMode::Wrap => Self::new_with_wrap(row, max_width, height),
-                }
+            };
+        } else if max_width == 0 {
+            return Self {
+                dim: Dimension::new(0, 0),
+                rows: vec![],
+            };
+        }
+        match wrap_mode {
+            WrapMode::Truncate(indicator) => {
+                Self::new_with_truncation(row, max_width, max_height, fill_height, indicator)
             }
+            WrapMode::Wrap => Self::new_with_wrap(row, max_width, max_height, fill_height),
         }
     }
 
-    fn new_with_wrap(mut row: Row, max_width: usize, height: Option<usize>) -> Self {
-        let max_height = height.unwrap_or(usize::MAX);
+    fn new_with_wrap(
+        mut row: Row,
+        max_width: usize,
+        req_height: Option<usize>,
+        fill_height: bool,
+    ) -> Self {
+        let max_height = req_height.unwrap_or(usize::MAX);
         let mut rows = vec![];
         let mut dim: Dimension = Dimension::empty();
         let mut current_row = Row::empty();
@@ -77,17 +89,22 @@ impl HorizontalMetrics {
             rows.push(current_row);
             current_row = Row::empty();
         }
-        if !current_row.is_empty()
-        {
+        if !current_row.is_empty() {
             dim = dim.vertical_union(current_row.dim);
             rows.push(current_row);
         }
-        
-        if let Some(height) = height
+
+        // Truncate height if required
+        if let Some(height) = req_height
             && let Some(last_row) = rows.last_mut()
-            && dim.height != height
+            && (dim.height > height || fill_height)
         {
             last_row.dim.height = height.saturating_sub(dim.height - last_row.dim.height);
+            dim.height = height;
+            // TODO Questionable:
+            last_row.cells.iter_mut().for_each(|(_, m)| {
+                m.dim.height = last_row.dim.height;
+            });
         }
 
         Self { dim, rows }
@@ -97,6 +114,7 @@ impl HorizontalMetrics {
         mut row: Row,
         max_width: usize,
         height: Option<usize>,
+        fill_height: bool,
         indicator: &str,
     ) -> Self {
         let indicator_len = min(max_width.saturating_sub(1), indicator.display_len());
@@ -123,8 +141,14 @@ impl HorizontalMetrics {
                 )),
             ),
         );
-        if let Some(height) = height {
+        if let Some(height) = height
+            && fill_height
+        {
             row.dim.height = height;
+            // TODO Questionable:
+            row.cells.iter_mut().for_each(|(_, m)| {
+                m.dim.height = height;
+            })
         }
         Self {
             dim: row.dim,

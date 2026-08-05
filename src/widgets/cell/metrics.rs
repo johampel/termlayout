@@ -10,7 +10,7 @@ use std::cmp::max;
 ///
 /// # Fields
 /// - `padding`: The padding around the content within the cell
-pub(crate) struct CellMetrics {
+pub struct CellMetrics {
     cell_dim: Dimension,
     content_dim: Dimension,
     content_clip_rect: Rect,
@@ -29,7 +29,7 @@ impl CellMetrics {
     ///
     /// # Returns
     /// A new [`CellMetrics`] instance with calculated dimensions and positions
-    pub(crate) fn new(
+    pub fn new(
         options: &LayoutOptions,
         content_dim: Dimension,
         content_clip: Option<Rect>,
@@ -88,7 +88,7 @@ impl CellMetrics {
     ///
     /// # Returns
     /// The [`LayoutOptions`] for the cell
-    pub(crate) fn cell_options(&self, fill_rows: bool, wrap_mode: WrapMode) -> LayoutOptions {
+    pub fn cell_options(&self, fill_rows: bool, wrap_mode: WrapMode) -> LayoutOptions {
         LayoutOptions::new(self.cell_dim, fill_rows, wrap_mode, None)
     }
 
@@ -100,7 +100,7 @@ impl CellMetrics {
     ///
     /// # Returns
     /// The [`LayoutOptions`] for the content
-    pub(crate) fn content_options(&self, fill_rows: bool, wrap_mode: WrapMode) -> LayoutOptions {
+    pub fn content_options(&self, fill_rows: bool, wrap_mode: WrapMode) -> LayoutOptions {
         LayoutOptions::new(
             self.content_dim,
             fill_rows,

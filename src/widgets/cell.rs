@@ -419,27 +419,6 @@ impl Cell {
         self.wrap_mode.unwrap_or(wrap_mode)
     }
 
-    /// Calculates the cell and content dimension based on the provided maximum width and wrap mode.
-    ///
-    /// # Parameters
-    /// - `max_width`: The maximum width in terms of columns; if set to `None`, the dimension is
-    ///   calculated based on the minimum size of the content.
-    /// - `wrap_mode`: The default [`WrapMode`] that is used in case the cell's wrap mode is not set.
-    ///
-    /// # Returns
-    /// The calculated dimension of the cell and content based on the provided parameters.
-    /// The first is the cell's dimension and the second is the content's dimension.
-    #[must_use]
-    #[deprecated(since = "0.1.1", note = "Use `measure()` instead")]
-    pub fn calculate_dims(
-        &self,
-        max_width: Option<usize>,
-        wrap_mode: WrapMode,
-    ) -> (Dimension, Dimension) {
-        let wrap_mode = self.effective_wrap_mode(wrap_mode);
-        self.dim.calculate_dims(&self.content, max_width, wrap_mode)
-    }
-
     /// Returns the visible content rectangle of the cell.
     /// This is the intersection of the content's dimension and the cell's clip rectangle, if set.
     /// If the cell has no clip rectangle, it returns the content's dimension. If the content
@@ -865,7 +844,7 @@ mod tests {
         assert_eq!(
             cell.measure(MeasureMode::pref_width(20, WrapMode::Wrap))
                 .dim,
-            Dimension::new(20, 2)
+            Dimension::new(10, 2)
         );
     }
 

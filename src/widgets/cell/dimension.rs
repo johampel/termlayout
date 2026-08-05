@@ -1,5 +1,5 @@
 use crate::core::measurements::MeasurementSpecifics;
-use crate::{Dimension, MeasureMode, Measurements, RcLayout, WrapMode};
+use crate::{Dimension, MeasureMode, Measurements, RcLayout};
 
 /// Defines the dimension of the content of a [`Cell`].
 /// The dimension might be a plain fixed [`Dimension`], which provides concrete values for
@@ -76,34 +76,6 @@ impl CellDimension {
     #[must_use]
     pub fn is_fill(&self) -> bool {
         matches!(self, CellDimension::Declarative(CellWidth::Fill))
-    }
-
-    /// Calculates the cell and content [`Dimension`] for the given `content`, `max_width`, and
-    /// `wrap_mode`.
-    ///
-    /// # Parameters
-    /// - `content`: The [`RcLayout`] of the cell content being laid out with this
-    ///   [`CellWidth`].
-    /// - `max_width`: The maximum width in terms of columns; if set to `None`, the dimension is
-    ///   calculated based on the minimum size of the content.
-    /// - `wrap_mode`: The default [`WrapMode`] that is used in case the cell's wrap mode is not set.
-    ///
-    /// # Returns
-    /// The calculated [`Dimension`] for the cell and content.
-    #[must_use]
-    #[deprecated(since = "0.1.1", note = "Use `measure()` instead")]
-    pub fn calculate_dims(
-        &self,
-        content: &RcLayout,
-        max_width: Option<usize>,
-        wrap_mode: WrapMode,
-    ) -> (Dimension, Dimension) {
-        match self {
-            CellDimension::Fixed { cell, content } => (*cell, *content),
-            CellDimension::Declarative(width) => {
-                width.calculate_dims(content, max_width, wrap_mode)
-            }
-        }
     }
 
     /// Calculates the [`Measurements`] for this instance.
@@ -188,58 +160,6 @@ pub enum CellWidth {
 }
 
 impl CellWidth {
-    /// Calculates the cell and content [`Dimension`] for the given `content`, `max_width`, and
-    /// `wrap_mode`.
-    ///
-    /// # Parameters
-    /// - `content`: The [`RcLayout`] of the cell content being laid out with this
-    ///   [`CellWidth`].
-    /// - `max_width`: The maximum width in terms of columns; if set to `None`, the dimension is
-    ///   calculated based on the minimum size of the content.
-    /// - `wrap_mode`: The default [`WrapMode`] that is used in case the cell's wrap mode is not set.
-    ///
-    /// # Returns
-    /// The calculated [`Dimension`] for the cell and content.
-    #[allow(clippy::missing_panics_doc)]
-    #[allow(clippy::cast_possible_truncation)]
-    #[allow(clippy::cast_sign_loss)]
-    #[allow(clippy::cast_precision_loss)]
-    #[deprecated(since = "0.1.1", note = "Use `measure()` instead")]
-    #[must_use]
-    pub fn calculate_dims(
-        &self,
-        content: &RcLayout,
-        max_width: Option<usize>,
-        wrap_mode: WrapMode,
-    ) -> (Dimension, Dimension) {
-        match self {
-            CellWidth::Fixed(w) => {
-                let dim = content.pref_dim_fixed_width(*w, wrap_mode);
-                (dim, dim)
-            }
-            CellWidth::Proportional(p) if max_width.is_some() => {
-                let w = (max_width.unwrap() as f32 * p) as usize;
-                let content = content.pref_dim(w, wrap_mode);
-                let cell = Dimension::new(w, content.height);
-                (cell, content)
-            }
-            CellWidth::Fill if max_width.is_some() => {
-                let w = max_width.unwrap();
-                let content = content.pref_dim(w, wrap_mode);
-                let cell = Dimension::new(w, content.height);
-                (cell, content)
-            }
-            CellWidth::Preferred(w) => {
-                let content = content.pref_dim(*w, wrap_mode);
-                let cell = Dimension::new(*w, content.height);
-                (cell, content)
-            }
-            _ => {
-                let dim = content.min_dim();
-                (dim, dim)
-            }
-        }
-    }
 
     /// Calculates the [`Measurements`] for the given `cell_content` and `mode`.
     ///
@@ -320,7 +240,7 @@ mod tests {
 
         // pref
         let result = CellWidth::Minimal.measure(&cell_content, MeasureMode::pref_width(4, WrapMode::default()));
-        assert_eq!(result.dim, Dimension::new(5, 3));
+        assert_eq!(result.dim, Dimension::new(4, 3));
         assert_eq!(result.specifics.child().unwrap().dim, Dimension::new(5, 3));
 
         let result = CellWidth::Minimal.measure(&cell_content, MeasureMode::pref_width(5, WrapMode::default()));
@@ -328,7 +248,7 @@ mod tests {
         assert_eq!(result.specifics.child().unwrap().dim, Dimension::new(5, 3));
 
         let result = CellWidth::Minimal.measure(&cell_content, MeasureMode::pref_width(8, WrapMode::default()));
-        assert_eq!(result.dim, Dimension::new(8, 3));
+        assert_eq!(result.dim, Dimension::new(5, 3));
         assert_eq!(result.specifics.child().unwrap().dim, Dimension::new(5, 3));
 
         // fixed_width
@@ -369,11 +289,11 @@ mod tests {
 
         // pref
         let result = CellWidth::Fixed(8).measure(&cell_content, MeasureMode::pref_width(6, WrapMode::default()));
-        assert_eq!(result.dim, Dimension::new(8, 2));
+        assert_eq!(result.dim, Dimension::new(6, 2));
         assert_eq!(result.specifics.child().unwrap().dim, Dimension::new(8, 2));
 
         let result = CellWidth::Fixed(8).measure(&cell_content, MeasureMode::pref_width(7, WrapMode::default()));
-        assert_eq!(result.dim, Dimension::new(8, 2));
+        assert_eq!(result.dim, Dimension::new(7, 2));
         assert_eq!(result.specifics.child().unwrap().dim, Dimension::new(8, 2));
 
         let result = CellWidth::Fixed(8).measure(&cell_content, MeasureMode::pref_width(8, WrapMode::default()));
@@ -419,7 +339,7 @@ mod tests {
 
         // pref
         let result = CellWidth::Preferred(8).measure(&cell_content, MeasureMode::pref_width(6, WrapMode::default()));
-        assert_eq!(result.dim, Dimension::new(7, 2));
+        assert_eq!(result.dim, Dimension::new(6, 2));
         assert_eq!(result.specifics.child().unwrap().dim, Dimension::new(7, 2));
 
         let result = CellWidth::Preferred(8).measure(&cell_content, MeasureMode::pref_width(7, WrapMode::default()));
@@ -427,7 +347,7 @@ mod tests {
         assert_eq!(result.specifics.child().unwrap().dim, Dimension::new(7, 2));
 
         let result = CellWidth::Preferred(8).measure(&cell_content, MeasureMode::pref_width(8, WrapMode::default()));
-        assert_eq!(result.dim, Dimension::new(8, 2));
+        assert_eq!(result.dim, Dimension::new(7, 2));
         assert_eq!(result.specifics.child().unwrap().dim, Dimension::new(7, 2));
 
         // fixed_width
@@ -469,7 +389,7 @@ mod tests {
 
         // pref
         let result = CellWidth::Fill.measure(&cell_content, MeasureMode::pref_width(6, WrapMode::default()));
-        assert_eq!(result.dim, Dimension::new(6, 3));
+        assert_eq!(result.dim, Dimension::new(5, 3));
         assert_eq!(result.specifics.child().unwrap().dim, Dimension::new(5, 3));
 
         let result = CellWidth::Fill.measure(&cell_content, MeasureMode::pref_width(7, WrapMode::default()));
@@ -477,7 +397,7 @@ mod tests {
         assert_eq!(result.specifics.child().unwrap().dim, Dimension::new(7, 2));
 
         let result = CellWidth::Fill.measure(&cell_content, MeasureMode::pref_width(8, WrapMode::default()));
-        assert_eq!(result.dim, Dimension::new(8, 2));
+        assert_eq!(result.dim, Dimension::new(7, 2));
         assert_eq!(result.specifics.child().unwrap().dim, Dimension::new(7, 2));
 
         // fixed_width
@@ -518,7 +438,7 @@ mod tests {
 
         // pref
         let result = CellWidth::Proportional(1.5).measure(&cell_content, MeasureMode::pref_width(6, WrapMode::default()));
-        assert_eq!(result.dim, Dimension::new(7, 2));
+        assert_eq!(result.dim, Dimension::new(6, 2));
         assert_eq!(result.specifics.child().unwrap().dim, Dimension::new(7, 2));
 
         let result = CellWidth::Proportional(1.5).measure(&cell_content, MeasureMode::pref_width(7, WrapMode::default()));
@@ -526,7 +446,7 @@ mod tests {
         assert_eq!(result.specifics.child().unwrap().dim, Dimension::new(7, 2));
 
         let result = CellWidth::Proportional(1.5).measure(&cell_content, MeasureMode::pref_width(8, WrapMode::default()));
-        assert_eq!(result.dim, Dimension::new(8, 2));
+        assert_eq!(result.dim, Dimension::new(7, 2));
         assert_eq!(result.specifics.child().unwrap().dim, Dimension::new(7, 2));
 
         // fixed_width

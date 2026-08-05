@@ -359,6 +359,15 @@ impl<'a> DecoratedTable<'a> {
         Some(cell.unwrap_or_else(|| self.empty_cell.clone()))
     }
 
+    pub(crate) fn is_deco(&self, row: usize, col: usize) -> bool {
+        self.row_index(row).map(|r| r.is_deco()).unwrap_or_default()
+            || self
+                .column_index(col)
+                .map(|c| c.is_deco())
+                .unwrap_or_default()
+    }
+
+    #[must_use]
     pub(crate) fn table_column_at(&self, col: usize) -> Option<&TableColumn> {
         let col_index = self.column_index(col)?;
         match col_index {
