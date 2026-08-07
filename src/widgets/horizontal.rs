@@ -91,10 +91,9 @@ impl Layout for Horizontal {
     }
 
     fn layout_with_context(&'_ self, context: LayoutContext) -> BoxedFormattedLayout<'_> {
-        if context.measurements.specifics.rows().is_some() {
-            Row::layout(context).unwrap()
-        } else {
-            self.layout_strict(context.options)
+        match &context.measurements.specifics { 
+            MeasurementSpecifics::Rows(rows) => Row::layout(context).unwrap(),
+            _ => self.layout_strict(context.options)
         }
     }
 

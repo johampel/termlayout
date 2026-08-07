@@ -133,7 +133,7 @@ impl From<CellWidth> for CellDimension {
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub enum CellWidth {
     /// The width of the cell content is the same as the minimum width of its content, as
-    /// returned by [`min_dim()`](Layout::min_dim)
+    /// returned by [`measure()`](Layout::measure) with mode [`MeasureMode::Min`].
     #[default]
     Minimal,
 
