@@ -92,7 +92,7 @@ impl Layout for Horizontal {
 
     fn layout_with_context(&'_ self, context: LayoutContext) -> BoxedFormattedLayout<'_> {
         match &context.measurements.specifics { 
-            MeasurementSpecifics::Rows(rows) => Row::layout(context).unwrap(),
+            MeasurementSpecifics::Rows(_) => Row::layout(context).unwrap(),
             _ => self.layout_strict(context.options)
         }
     }

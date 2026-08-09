@@ -247,7 +247,8 @@ impl List {
 
     fn measure_item(item: RcLayout, marker_width: usize, mode: MeasureMode) -> Measurements {
         let content_measurements = item.measure(mode);
-        let marker_measurements: Measurements = Dimension::new(marker_width, content_measurements.dim.height).into();
+        let marker_measurements: Measurements =
+            Dimension::new(marker_width, content_measurements.dim.height).into();
         Measurements::new(
             content_measurements
                 .dim
@@ -275,7 +276,7 @@ impl Layout for List {
         let mut children = Vec::with_capacity(self.items.len());
         let mut dim = Dimension::empty();
 
-        for item in self.items.iter() {
+        for (index, item) in self.items.iter().enumerate() {
             let item_mode = match mode {
                 MeasureMode::Min => MeasureMode::Min,
                 MeasureMode::PrefWidth { wrap_mode, .. } => {
@@ -290,7 +291,7 @@ impl Layout for List {
             };
             let mut item_measurements = Self::measure_item(item.clone(), marker_width, item_mode);
             if let Some(h) = height {
-                if h < item_measurements.dim.height {
+                if h < item_measurements.dim.height || index == self.items.len() - 1 {
                     item_measurements.dim.height = h;
                 }
                 height = Some(h.saturating_sub(item_measurements.dim.height))
@@ -848,8 +849,28 @@ mod tests {
     #[test]
     fn list_measure_min() {
         let list = sample_list();
+
         let result = list.measure(MeasureMode::Min);
+
         assert_eq!(result.dim, Dimension::new(15, 64));
+        let children = result.specifics.children().unwrap();
+        assert_eq!(children.len(), 3);
+        assert_eq!(children[0].dim, Dimension::new(15, 19));
+        assert_eq!(children[1].dim, Dimension::new(15, 29));
+        assert_eq!(children[2].dim, Dimension::new(15, 16));
+    }
+
+    #[test]
+    fn list_measure_exact() {
+        let list = sample_list();
+
+        let result = list.measure(MeasureMode::exact(Dimension::new(50, 40), WrapMode::Wrap));
+        assert_eq!(result.dim, Dimension::new(50, 40));
+        let children = result.specifics.children().unwrap();
+        assert_eq!(children.len(), 3);
+        assert_eq!(children[0].dim, Dimension::new(50, 4));
+        assert_eq!(children[1].dim, Dimension::new(50, 6));
+        assert_eq!(children[2].dim, Dimension::new(50, 30));
     }
 
     #[test]
@@ -858,8 +879,20 @@ mod tests {
 
         let result = list.measure(MeasureMode::pref_width(100, WrapMode::Wrap));
         assert_eq!(result.dim, Dimension::new(100, 7));
+        let children = result.specifics.children().unwrap();
+        assert_eq!(children.len(), 3);
+        assert_eq!(children[0].dim, Dimension::new(100, 2));
+        assert_eq!(children[1].dim, Dimension::new(99, 3));
+        assert_eq!(children[2].dim, Dimension::new(95, 2));
+
         let result = list.measure(MeasureMode::pref_width(50, WrapMode::Wrap));
         assert_eq!(result.dim, Dimension::new(50, 14));
+        let children = result.specifics.children().unwrap();
+        assert_eq!(children.len(), 3);
+        assert_eq!(children[0].dim, Dimension::new(46, 4));
+        assert_eq!(children[1].dim, Dimension::new(50, 6));
+        assert_eq!(children[2].dim, Dimension::new(48, 4));
+
         let result = list.measure(MeasureMode::pref_width(2, WrapMode::Wrap));
         assert_eq!(result.dim, Dimension::new(2, 447));
         let result = list.measure(MeasureMode::pref_width(1, WrapMode::Wrap));
@@ -882,21 +915,21 @@ mod tests {
         assert_eq!(
             result,
             concat!(
-            "i.   Lorem ipsum dolor sit amet, consetetur\n",
-            "     sadipscing elitr, sed diam nonumy eirmod\n",
-            "     tempor invidunt ut labore et dolore magna\n",
-            "     aliquyam erat, sed diam voluptua.\n",
-            "ii.  Stet clita kasd gubergren, no sea takimata\n",
-            "     sanctus est Lorem ipsum dolor sit amet. Lorem\n",
-            "     ipsum dolor sit amet, consetetur sadipscing\n",
-            "     elitr, sed diam nonumy eirmod tempor invidunt\n",
-            "     ut labore et dolore magna aliquyam erat, sed\n",
-            "     diam voluptua.\n",
-            "iii. At vero eos et accusam et justo duo dolores\n",
-            "     et ea rebum. Stet clita kasd gubergren, no\n",
-            "     sea takimata sanctus est Lorem ipsum dolor\n",
-            "     sit amet.\n",
-            "\n"
+                "i.   Lorem ipsum dolor sit amet, consetetur\n",
+                "     sadipscing elitr, sed diam nonumy eirmod\n",
+                "     tempor invidunt ut labore et dolore magna\n",
+                "     aliquyam erat, sed diam voluptua.\n",
+                "ii.  Stet clita kasd gubergren, no sea takimata\n",
+                "     sanctus est Lorem ipsum dolor sit amet. Lorem\n",
+                "     ipsum dolor sit amet, consetetur sadipscing\n",
+                "     elitr, sed diam nonumy eirmod tempor invidunt\n",
+                "     ut labore et dolore magna aliquyam erat, sed\n",
+                "     diam voluptua.\n",
+                "iii. At vero eos et accusam et justo duo dolores\n",
+                "     et ea rebum. Stet clita kasd gubergren, no\n",
+                "     sea takimata sanctus est Lorem ipsum dolor\n",
+                "     sit amet.\n",
+                "\n"
             )
         );
 
@@ -907,21 +940,21 @@ mod tests {
         assert_eq!(
             result,
             concat!(
-            "i.   Lorem ipsum dolor sit amet, consetetur       \n",
-            "     sadipscing elitr, sed diam nonumy eirmod     \n",
-            "     tempor invidunt ut labore et dolore magna    \n",
-            "     aliquyam erat, sed diam voluptua.            \n",
-            "ii.  Stet clita kasd gubergren, no sea takimata   \n",
-            "     sanctus est Lorem ipsum dolor sit amet. Lorem\n",
-            "     ipsum dolor sit amet, consetetur sadipscing  \n",
-            "     elitr, sed diam nonumy eirmod tempor invidunt\n",
-            "     ut labore et dolore magna aliquyam erat, sed \n",
-            "     diam voluptua.                               \n",
-            "iii. At vero eos et accusam et justo duo dolores  \n",
-            "     et ea rebum. Stet clita kasd gubergren, no   \n",
-            "     sea takimata sanctus est Lorem ipsum dolor   \n",
-            "     sit amet.                                    \n",
-            "                                                  \n"
+                "i.   Lorem ipsum dolor sit amet, consetetur       \n",
+                "     sadipscing elitr, sed diam nonumy eirmod     \n",
+                "     tempor invidunt ut labore et dolore magna    \n",
+                "     aliquyam erat, sed diam voluptua.            \n",
+                "ii.  Stet clita kasd gubergren, no sea takimata   \n",
+                "     sanctus est Lorem ipsum dolor sit amet. Lorem\n",
+                "     ipsum dolor sit amet, consetetur sadipscing  \n",
+                "     elitr, sed diam nonumy eirmod tempor invidunt\n",
+                "     ut labore et dolore magna aliquyam erat, sed \n",
+                "     diam voluptua.                               \n",
+                "iii. At vero eos et accusam et justo duo dolores  \n",
+                "     et ea rebum. Stet clita kasd gubergren, no   \n",
+                "     sea takimata sanctus est Lorem ipsum dolor   \n",
+                "     sit amet.                                    \n",
+                "                                                  \n"
             )
         );
 
@@ -937,14 +970,14 @@ mod tests {
         assert_eq!(
             result,
             concat!(
-            "   sanctus est Lorem ipsum dol\n",
-            "   ipsum dolor sit amet, conse\n",
-            "   elitr, sed diam nonumy eirm\n",
-            "   ut labore et dolore magna a\n",
-            "   diam voluptua.             \n",
-            "i. At vero eos et accusam et j\n",
-            "   et ea rebum. Stet clita kas\n",
-            "   sea takimata sanctus est Lo\n",
+                "   sanctus est Lorem ipsum dol\n",
+                "   ipsum dolor sit amet, conse\n",
+                "   elitr, sed diam nonumy eirm\n",
+                "   ut labore et dolore magna a\n",
+                "   diam voluptua.             \n",
+                "i. At vero eos et accusam et j\n",
+                "   et ea rebum. Stet clita kas\n",
+                "   sea takimata sanctus est Lo\n",
             )
         );
     }
@@ -964,14 +997,14 @@ mod tests {
         assert_eq!(
             result,
             concat!(
-            "   sanctus est Lorem ipsum dol\n",
-            "   ipsum dolor sit amet, conse\n",
-            "   elitr, sed diam nonumy eirm\n",
-            "   ut labore et dolore magna a\n",
-            "   diam voluptua.             \n",
-            "i. At vero eos et accusam et j\n",
-            "   et ea rebum. Stet clita kas\n",
-            "   sea takimata sanctus est Lo\n",
+                "   sanctus est Lorem ipsum dol\n",
+                "   ipsum dolor sit amet, conse\n",
+                "   elitr, sed diam nonumy eirm\n",
+                "   ut labore et dolore magna a\n",
+                "   diam voluptua.             \n",
+                "i. At vero eos et accusam et j\n",
+                "   et ea rebum. Stet clita kas\n",
+                "   sea takimata sanctus est Lo\n",
             )
         );
     }

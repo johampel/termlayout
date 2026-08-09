@@ -1,11 +1,9 @@
+use crate::ext::Row;
 use crate::widgets::table::decoration::DecoratedTable;
 use crate::widgets::table::metrics::TableMetrics;
 use crate::widgets::{CellAnchor, CellWidth, TableDecoration};
-use crate::{rc_layout, BoxedFormattedLayout, Dimension, Layout, LayoutContext, LayoutOptions, MeasureMode, Measurements, RcLayout, WrapMode, MeasurementSpecifics, Rect};
+use crate::{BoxedFormattedLayout, Dimension, Layout, LayoutContext, MeasureMode, MeasurementSpecifics, Measurements, RcLayout, WrapMode, rc_layout};
 use std::any::Any;
-use crate::ext::Row;
-use crate::widgets::horizontal::row::FormattedRow;
-use crate::widgets::vertical::FormattedVertical;
 
 pub(crate) mod decoration;
 mod metrics;
@@ -81,7 +79,7 @@ impl Layout for Table {
 
     fn layout_with_context(&'_ self, context: LayoutContext) -> BoxedFormattedLayout<'_> {
         match &context.measurements.specifics {
-            MeasurementSpecifics::Rows(rows) => Row::layout(context).unwrap(),
+            MeasurementSpecifics::Rows(_) => Row::layout(context).unwrap(),
             _ => self.layout_strict(context.options)
         }
     }
@@ -213,9 +211,9 @@ impl Default for TableColumn {
 
 #[cfg(test)]
 mod tests {
-    use crate::{Dimension, Rect};
     use crate::widgets::table::*;
     use crate::widgets::{Filler, Lines};
+    use crate::{Dimension, LayoutOptions, Rect};
 
     #[test]
     fn table_layout_fit_with_anchor() {

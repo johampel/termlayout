@@ -40,7 +40,7 @@ impl<'a> TableMetrics<'a> {
         // First collect all rows
         let mut all_rows = VecDeque::with_capacity(self.table.rows);
         for row in 0..self.table.rows {
-            let mut metrics = self.row(row, wrap_mode, max_width, req_height);
+            let  metrics = self.row(row, wrap_mode, max_width, req_height);
             if let Some(height) = req_height {
                 req_height = Some(height.saturating_sub(metrics.dim.height));
             }
@@ -97,7 +97,7 @@ impl<'a> TableMetrics<'a> {
                 if self.table.is_deco(row, col) {
                     measurements.dim = cell_dim
                 }
-                let mut content_dim = measurements.dim;
+                let  content_dim = measurements.dim;
                 (
                     Cell::new(
                         content,
@@ -208,16 +208,5 @@ impl<'a> TableMetrics<'a> {
             }
             self.heights[row] = height;
         }
-    }
-
-    /// Returns the total dimension of the table.
-    ///
-    /// # Returns
-    /// The dimension of the entire table
-    pub(crate) fn dim(&self) -> Dimension {
-        Dimension::new(
-            self.widths.iter().sum::<usize>(),
-            self.heights.iter().sum::<usize>(),
-        )
     }
 }
