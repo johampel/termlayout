@@ -144,7 +144,7 @@ impl<'a> TableMetrics<'a> {
                 match fill_width {
                     Some(width) => {
                         self.widths[col] = width.checked_div(fill_count).map_or(1, |w| w.max(1));
-                        fill_width = Some(width - self.widths[col]);
+                        fill_width = Some(width.saturating_sub(self.widths[col]));
                         fill_count -= 1;
                     }
                     None => {
