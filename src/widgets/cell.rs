@@ -43,7 +43,7 @@ use std::cmp::min;
 /// to match the constraints of the anchor.
 ///
 /// All these calculations also respect the `clip` field (which contains the optional clipping of
-/// the content) and all the other settings of the [`LayoutOptions`] that is active during the layout
+/// the content) and all the other settings of the [`crate::LayoutOptions`] that is active during the layout
 /// process.
 ///
 /// # Example

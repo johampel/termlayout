@@ -153,6 +153,7 @@ impl Dimension {
     /// assert_eq!(left, Dimension::new(3, 4));
     /// assert_eq!(right, Dimension::new(8, 4));
     /// ```
+    #[must_use] 
     pub fn split_horizontal(self, width: usize) -> (Self,Self) {
         (
             Self::new(min(self.width, width), self.height),
@@ -179,6 +180,7 @@ impl Dimension {
     /// assert_eq!(left, Dimension::new(4, 3));
     /// assert_eq!(right, Dimension::new(4, 8));
     /// ```
+    #[must_use] 
     pub fn split_vertical(self, height: usize) -> (Self,Self) {
         (
             Self::new(self.width, min(height, self.height)),

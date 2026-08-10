@@ -1,4 +1,16 @@
-//! Example demonstrating how to author an own [`Layout`] widget.
+//! Example demonstrating how to implement a custom [`Layout`](termlayout::Layout) widget.
+//!
+//! This example defines `TwoColumns`, a reusable widget that renders its content side-by-side in
+//! two columns separated by a configurable spacer string. When the available width is too narrow
+//! for two columns, the widget falls back to a single-column display automatically.
+//!
+//! The implementation uses the [`Cell`](termlayout::widgets::Cell) widget to split the content
+//! and combines the resulting halves with a [`Horizontal`](termlayout::widgets::Horizontal) layout.
+//!
+//! You can run this example using:
+//! ```bash
+//! cargo run --example two_columns
+//! ```
 
 use std::any::Any;
 use termlayout::ext::{DisplayStr, LayoutWithContext};

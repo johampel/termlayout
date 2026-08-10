@@ -13,9 +13,9 @@ use std::rc::Rc;
 pub enum MeasureMode {
     /// The `Min` sizing way tries to find the smallest possible size for the
     /// [`Layout`](crate::Layout) in terms of the width so that no truncation or wrapping is
-    /// required. For example, for [`Lines`](crate::Lines) it will return a
-    /// [`Measurements`](Measurements) struct with a [`Dimension`] having the width set to
-    /// the longest line and the height to the number of lines. For [`Paragraphs`](crate::Paragraph)
+    /// required. For example, for [`Lines`](crate::widgets::Lines) it will return a
+    /// [`Measurements`] struct with a [`Dimension`] having the width set to
+    /// the longest line and the height to the number of lines. For [`Paragraph`](crate::widgets::Paragraph)
     /// the dimension will have the width set to the longest word and the height is computed
     /// accordingly.
     Min,
@@ -79,7 +79,7 @@ pub enum MeasureMode {
         /// The [`WrapMode`]
         wrap_mode: WrapMode,
     },
-    /// The [`Exact`] sizing mode predefines the [`Dimension`] of the [`Measurements`]. The
+    /// The [`Exact`](MeasureMode::Exact) sizing mode predefines the [`Dimension`] of the [`Measurements`]. The
     /// given `dimension` and `wrap_mode` might influence the internal specific sizings stored
     /// in the [`MeasurementSpecifics`], if any.
     Exact {
@@ -155,9 +155,9 @@ impl MeasureMode {
     pub fn wrap_mode(&self) -> WrapMode {
         match self {
             Self::Min => WrapMode::default(),
-            Self::PrefWidth { wrap_mode, .. } => *wrap_mode,
-            Self::FixedWidth { wrap_mode, .. } => *wrap_mode,
-            Self::Exact { wrap_mode, .. } => *wrap_mode,
+            Self::PrefWidth { wrap_mode, .. }
+            | Self::FixedWidth { wrap_mode, .. }
+            | Self::Exact { wrap_mode, .. } => *wrap_mode,
         }
     }
 
@@ -226,14 +226,13 @@ impl MeasureMode {
     /// Coerces a concrete height.
     /// Depending on the variant and the `height` parameter, it returns the best fitting height,
     /// which is typically the `height` parameter itself, except in the `Exact` variant, where
-    /// the height is taken from the exact dimension:
+    /// the height is taken from the exact dimension.
     ///
     /// # Parameters
     /// - `height`: The reference height.
     ///
     /// # Returns
     /// The best fitting height.
-    /// ```
     #[must_use]
     pub fn coerce_height(&self, height: usize) -> usize {
         self.height().unwrap_or(height)
@@ -449,13 +448,13 @@ impl Measurements {
         let children = children
             .into_iter()
             .map(|(layout, measurement)| {
-                if measurement.dim.width != dim.width {
+                if measurement.dim.width == dim.width {
+                    measurement
+                } else {
                     layout.measure(MeasureMode::exact(
                         Dimension::new(dim.width, measurement.dim.height),
                         mode.wrap_mode(),
                     ))
-                } else {
-                    measurement
                 }
             })
             .collect();
@@ -497,6 +496,7 @@ impl MeasurementSpecifics {
     /// 
     /// # Returns
     /// `true`, if this instance is `None`.
+    #[must_use] 
     pub fn is_none(&self) -> bool {
         matches!(self, Self::None)
     }
@@ -505,6 +505,7 @@ impl MeasurementSpecifics {
     /// 
     /// # Returns
     /// A slice of [`Measurements`] or `None`, if the variant is not `Children`.
+    #[must_use] 
     pub fn children(&self) -> Option<&[Measurements]> {
         match self {
             MeasurementSpecifics::Children(children) => Some(children),
@@ -516,6 +517,7 @@ impl MeasurementSpecifics {
     ///
     /// # Returns
     /// A s[`Measurements`] or `None`, if the variant is not `Child`.
+    #[must_use] 
     pub fn child(&self) -> Option<&Measurements> {
         match self {
             MeasurementSpecifics::Child(child) => Some(child.as_ref()),
@@ -523,10 +525,11 @@ impl MeasurementSpecifics {
         }
     }
 
-    /// Returns - if present - a list of child [`Rows`].
+    /// Returns - if present - a list of child [`Row`](crate::ext::Row)s.
     ///
     /// # Returns
-    /// A slice of [`Rows`] or `None`, if the variant is not `Rows`.
+    /// A slice of [`Row`](crate::ext::Row)s or `None`, if the variant is not `Rows`.
+    #[must_use] 
     pub fn rows(&self) -> Option<&[Row]> {
         match self {
             MeasurementSpecifics::Rows(rows) => Some(rows),

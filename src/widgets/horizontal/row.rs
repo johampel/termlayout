@@ -12,7 +12,7 @@ use std::cmp::max;
 use std::collections::VecDeque;
 use std::fmt::Write;
 
-/// Represents a horizontally arranged set of [`Cell`]s and its corresponding [`Measurments`].
+/// Represents a horizontally arranged set of [`Cell`]s and its corresponding [`Measurements`].
 ///
 /// A `Row` is a helper struct for the [`Horizontal`](super::Horizontal) and
 /// [`Table`](crate::widgets::Table) widgets. It does not implement the `Layout` trait and is not
@@ -55,12 +55,12 @@ impl Row {
         Self::new(Dimension::new(0, 0), VecDeque::new())
     }
 
-    /// Adds a [`Cell`]-[`Measurement`] pair to the end of the instance.
+    /// Adds a [`Cell`]-[`Measurements`] pair to the end of the instance.
     /// The method implicitly updates the `dim` field.
     ///
     /// # Parameters
     /// - `cell`: The [`Cell`] to append
-    /// - `measurements`: The corresponding [`Measurments`]
+    /// - `measurements`: The corresponding [`Measurements`]
     ///
     /// # Èxample
     /// ```rust
@@ -88,12 +88,12 @@ impl Row {
         self.cells.push_back((cell, measurement));
     }
 
-    /// Adds a [`Cell`]-[`Measurement`] pair to the start of the instance.
+    /// Adds a [`Cell`]-[`Measurements`] pair to the start of the instance.
     /// The method implicitly updates the `dim` field.
     ///
     /// # Parameters
     /// - `cell`: The [`Cell`] to prepend
-    /// - `measurements`: The corresponding [`Measurments`]
+    /// - `measurements`: The corresponding [`Measurements`]
     ///
     /// # Èxample
     /// ```rust
@@ -121,12 +121,12 @@ impl Row {
         self.cells.push_front((cell, measurement));
     }
 
-    /// Removes the [`Cell`]-[`Measurement`] pair from the end of the instance.
+    /// Removes the [`Cell`]-[`Measurements`] pair from the end of the instance.
     /// The method implicitly updates the `dim` field. This is the inverse operation of
     /// [`push_back`](Row::push_back)
     ///
     /// # Returns
-    /// The removed [`Cell`]-[`Measurement`] pair, if any.
+    /// The removed [`Cell`]-[`Measurements`] pair, if any.
     ///
     pub fn pop_back(&mut self) -> Option<(Cell, Measurements)> {
         let result = self.cells.pop_back();
@@ -136,6 +136,12 @@ impl Row {
         result
     }
 
+    /// Removes the [`Cell`]-[`Measurements`] pair from the front of the instance.
+    /// The method implicitly updates the `dim` field. This is the inverse operation of
+    /// [`push_front`](Row::push_front).
+    ///
+    /// # Returns
+    /// The removed [`Cell`]-[`Measurements`] pair, if any.
     pub fn pop_front(&mut self) -> Option<(Cell, Measurements)> {
         let result = self.cells.pop_front();
         if result.is_some() {
@@ -152,10 +158,15 @@ impl Row {
             .fold(Dimension::empty(), |a, b| a.horizontal_union(b));
     }
 
+    /// Fixes the height of each cell in the row to the row's overall height and adjusts
+    /// the `CellDimension` of each cell to its concrete `Fixed` variant.
+    ///
+    /// This is called just before rendering to ensure that all cells in a row share the same
+    /// height and that their dimensions are fully resolved.
     pub fn fixiate_cell_dims(&mut self) {
         self.cells.iter_mut().for_each(|(c, m)| {
             m.dim.height = self.dim.height;
-            let mut content_dim = m.specifics.child().map(|m| m.dim).unwrap_or(m.dim);
+            let mut content_dim = m.specifics.child().map_or(m.dim, |m| m.dim);
             if matches!(c.anchor, CellAnchor::Fill) {
                 content_dim = Dimension::new(
                     max(content_dim.width, m.dim.width),
@@ -167,12 +178,27 @@ impl Row {
                 cell: m.dim,
                 content: content_dim,
             }
-        })
+        });
     }
+    /// Returns `true` if this row contains no cells.
+    #[must_use] 
     pub fn is_empty(&self) -> bool {
         self.cells.is_empty()
     }
 
+    /// Renders a [`LayoutContext`] whose [`Measurements`] specifics contain a list of [`Row`]s
+    /// into a [`BoxedFormattedLayout`].
+    ///
+    /// This is the rendering counterpart to [`crate::ext::HorizontalMetrics`]: the rows
+    /// stored in the measurements are laid out vertically, each row being rendered by a
+    /// `FormattedRow`.
+    ///
+    /// # Parameters
+    /// - `context`: The [`LayoutContext`] containing the options and row-based measurements.
+    ///
+    /// # Returns
+    /// `Some(layout)` if the measurements contain a valid list of rows, `None` otherwise.
+    #[must_use] 
     pub fn layout(context: LayoutContext) -> Option<BoxedFormattedLayout<'static>> {
         let specifics: Result<Vec<Row>, _> = context.measurements.specifics.try_into();
         match specifics {
@@ -186,7 +212,7 @@ impl Row {
                             context.options.intersect(Rect::new(0, y, row.dim), false);
                         y += row.dim.height;
                         FormattedRow::new(
-                            row.cells.iter().map(|e| e.clone()).collect::<Vec<_>>(),
+                            row.cells.iter().cloned().collect::<Vec<_>>(),
                             row_options,
                         )
                         .into()

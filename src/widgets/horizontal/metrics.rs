@@ -4,12 +4,33 @@ use crate::widgets::{Cell, CellAnchor, Filler};
 use crate::{Dimension, Layout, MeasureMode, MeasurementSpecifics, Measurements, WrapMode};
 use std::cmp::{max, min};
 
+/// Precomputed layout metrics for a [`crate::widgets::Horizontal`] widget.
+///
+/// `HorizontalMetrics` holds the overall dimension and the row distribution that results from
+/// measuring and wrapping a sequence of [`crate::widgets::Cell`]s into display rows.
+/// It is an intermediate result produced during the `measure` phase and consumed when
+/// rendering the [`crate::widgets::Horizontal`] widget.
 pub struct HorizontalMetrics {
+    /// The overall [`Dimension`] of the laid-out widget.
     pub dim: Dimension,
+    /// The list of [`Row`]s that make up the widget after wrapping.
     pub rows: Vec<Row>,
 }
 
 impl HorizontalMetrics {
+    /// Measures a slice of [`crate::widgets::Cell`]s and organises them into rows.
+    ///
+    /// This is the main entry point for computing [`HorizontalMetrics`] from a list of cells.
+    /// It measures each cell individually and then calls [`from_row`](Self::from_row) to apply
+    /// wrapping or truncation as required by `mode`.
+    ///
+    /// # Parameters
+    /// - `cells`: The slice of [`crate::widgets::Cell`]s to measure.
+    /// - `mode`: The [`MeasureMode`] that controls sizing and wrapping.
+    ///
+    /// # Returns
+    /// The resulting [`HorizontalMetrics`].
+    #[must_use] 
     pub fn from_cells(cells: &[Cell], mode: MeasureMode) -> Self {
         let max_height = mode.height();
         // Build a row containing all cells
@@ -31,6 +52,22 @@ impl HorizontalMetrics {
         )
     }
 
+    /// Converts a single [`Row`] into [`HorizontalMetrics`] by applying wrapping or truncation.
+    ///
+    /// If the row fits within `max_width`, it is returned as-is. Otherwise the row is either
+    /// wrapped onto multiple rows ([`WrapMode::Wrap`]) or truncated to a single row
+    /// ([`WrapMode::Truncate`]).
+    ///
+    /// # Parameters
+    /// - `row`: The [`Row`] to lay out.
+    /// - `wrap_mode`: Controls whether content wraps or is truncated.
+    /// - `max_width`: The maximum available display width.
+    /// - `max_height`: Optional maximum height. If `Some`, rendering stops at that height.
+    /// - `fill_height`: If `true`, the last row is padded to reach `max_height`.
+    ///
+    /// # Returns
+    /// The resulting [`HorizontalMetrics`].
+    #[must_use] 
     pub fn from_row(
         row: Row,
         wrap_mode: WrapMode,
@@ -148,7 +185,7 @@ impl HorizontalMetrics {
             // TODO Questionable:
             row.cells.iter_mut().for_each(|(_, m)| {
                 m.dim.height = height;
-            })
+            });
         }
         Self {
             dim: row.dim,

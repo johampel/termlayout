@@ -126,7 +126,7 @@ impl Layout for Vertical {
                     .collect();
                 FormattedVertical::new(children, context.options).into()
             }
-            Err(_) => return self.layout_strict(context.options),
+            Err(_) => self.layout_strict(context.options),
         }
     }
 

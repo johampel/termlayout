@@ -360,11 +360,10 @@ impl<'a> DecoratedTable<'a> {
     }
 
     pub(crate) fn is_deco(&self, row: usize, col: usize) -> bool {
-        self.row_index(row).map(|r| r.is_deco()).unwrap_or_default()
+        self.row_index(row).is_some_and(|r| r.is_deco())
             || self
                 .column_index(col)
-                .map(|c| c.is_deco())
-                .unwrap_or_default()
+                .is_some_and(|c| c.is_deco())
     }
 
     #[must_use]

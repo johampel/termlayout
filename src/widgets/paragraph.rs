@@ -181,7 +181,7 @@ impl Paragraph {
         let mut line_len = 0;
         let mut words = TakeBackIterator::new(self.content.display_words());
         if fixed_width {
-            cols = max_width
+            cols = max_width;
         }
         while let Some(word) = words.next() {
             let word_len = word.display_len();

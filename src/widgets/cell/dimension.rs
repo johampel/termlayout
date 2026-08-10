@@ -1,7 +1,7 @@
 use crate::core::measurements::MeasurementSpecifics;
 use crate::{Dimension, MeasureMode, Measurements, RcLayout};
 
-/// Defines the dimension of the content of a [`Cell`].
+/// Defines the dimension of the content of a [`crate::widgets::Cell`].
 /// The dimension might be a plain fixed [`Dimension`], which provides concrete values for
 /// the width and height, or it might be a [`CellWidth`] that describes how the width is computed.
 ///
@@ -87,7 +87,7 @@ impl CellDimension {
     /// - `mode`: The [`MeasureMode`] defining how to measure the cell's dimension.
     ///
     /// # Returns
-    /// The [`Measurement`] for the cell, which has a child representing the `Measurements` of the
+    /// The [`Measurements`] for the cell, which has a child representing the `Measurements` of the
     /// content.
     #[must_use]
     pub fn measure(&self, cell_content: &RcLayout, mode: MeasureMode) -> Measurements {
@@ -102,6 +102,17 @@ impl CellDimension {
         }
     }
 
+    /// Derives a [`MeasureMode`] suitable for measuring the cell's content from this instance.
+    ///
+    /// For the `Fixed` variant, this returns `MeasureMode::FixedWidth` using the cell's width.
+    /// For the `Declarative` variant, this delegates to [`CellWidth::derive_cell_measure_mode`].
+    ///
+    /// # Parameters
+    /// - `mode`: The outer [`MeasureMode`] providing the wrap mode and optional width.
+    ///
+    /// # Returns
+    /// A [`MeasureMode`] for measuring the cell content.
+    #[must_use] 
     pub fn derive_cell_measure_mode(&self, mode: MeasureMode) -> MeasureMode {
         match self {
             CellDimension::Fixed { cell, .. } => {
@@ -127,13 +138,13 @@ impl From<CellWidth> for CellDimension {
     }
 }
 
-/// Defines the width of the content of a [`Cell`].
+/// Defines the width of the content of a [`crate::widgets::Cell`].
 /// Using this enum, it is possible to define the width of the cell's content as a fixed value or a
 /// dynamic one that depends on the available space and usage.
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub enum CellWidth {
     /// The width of the cell content is the same as the minimum width of its content, as
-    /// returned by [`measure()`](Layout::measure) with mode [`MeasureMode::Min`].
+    /// returned by [`measure()`](crate::Layout::measure) with mode [`MeasureMode::Min`].
     #[default]
     Minimal,
 
@@ -141,8 +152,8 @@ pub enum CellWidth {
     Fixed(usize),
 
     /// The width of the cell content is the same as the preferred width of the content,
-    /// as returned by [`measure()`](Layout::measure) with [mode pref-width](MeasureMode::PrefWidth)
-    /// for the given `value`. Note that this is a subtile way different from `Fixed`, since the
+    /// as returned by [`measure()`](crate::Layout::measure) with mode [`MeasureMode::PrefWidth`]
+    /// for the given `value`. Note that this is a subtle difference from `Fixed`, since the
     /// actual width might be smaller than `value`.
     Preferred(usize),
 
@@ -177,7 +188,7 @@ impl CellWidth {
     /// - `mode`: The [`MeasureMode`] defining how to measure the cell's dimension.
     ///
     /// # Returns
-    /// The [`Measurement`] for the cell, which has a child representing the `Measurements` of the
+    /// The [`Measurements`] for the cell, which has a child representing the `Measurements` of the
     /// content.
     pub fn measure(&self, cell_content: &RcLayout, mode: MeasureMode) -> Measurements {
         let inner = match (self, mode.width()) {
@@ -188,6 +199,7 @@ impl CellWidth {
                 cell_content.measure(MeasureMode::pref_width(*w, mode.wrap_mode()))
             }
             (CellWidth::Proportional(p), Some(max_width)) => {
+                #[allow(clippy::cast_precision_loss, clippy::cast_possible_truncation, clippy::cast_sign_loss)]
                 let w = (max_width as f32 * p) as usize;
                 cell_content.measure(MeasureMode::pref_width(w, mode.wrap_mode()))
             }
@@ -202,6 +214,14 @@ impl CellWidth {
         )
     }
 
+    /// Derives a [`MeasureMode`] suitable for measuring a cell's content based on this `CellWidth`.
+    ///
+    /// # Parameters
+    /// - `mode`: The outer [`MeasureMode`] providing the wrap mode and optional available width.
+    ///
+    /// # Returns
+    /// A [`MeasureMode`] for measuring the cell content.
+    #[must_use] 
     pub fn derive_cell_measure_mode(&self, mode: MeasureMode) -> MeasureMode {
         match self {
             CellWidth::Minimal => MeasureMode::Min,
@@ -212,6 +232,7 @@ impl CellWidth {
             CellWidth::Preferred(w) => MeasureMode::pref_width(*w, mode.wrap_mode()),
             CellWidth::Proportional(p) => match mode.width() {
                 Some(w) => {
+                    #[allow(clippy::cast_precision_loss, clippy::cast_possible_truncation, clippy::cast_sign_loss)]
                     let w = (w as f32 * p) as usize;
                     MeasureMode::fixed_width(w, mode.wrap_mode())
                 }

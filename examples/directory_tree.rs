@@ -1,7 +1,13 @@
-//! Example demonstrating the [`Tree`] widget.
+//! Example demonstrating the [`Tree`](termlayout::widgets::Tree) widget.
+//!
 //! It is an interactive example that renders a directory as a tree structure (only directories are
-//! shown, files are omitted); using a simple menu you may change the displayed directory
-//! interactively when the example runs.
+//! shown, files are omitted). Using a simple menu you may change the displayed directory
+//! interactively while the example is running.
+//!
+//! You can run this example using:
+//! ```bash
+//! cargo run --example directory_tree
+//! ```
 
 use std::borrow::Cow;
 use std::fs;

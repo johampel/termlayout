@@ -188,10 +188,8 @@ impl Layout for Menu {
                 MeasureMode::PrefWidth { wrap_mode, .. } => {
                     MeasureMode::pref_width(item_width, wrap_mode)
                 }
-                MeasureMode::FixedWidth { wrap_mode, .. } => {
-                    MeasureMode::fixed_width(item_width, wrap_mode)
-                }
-                MeasureMode::Exact { wrap_mode, .. } => {
+                MeasureMode::FixedWidth { wrap_mode, .. }
+                | MeasureMode::Exact { wrap_mode, .. } => {
                     MeasureMode::fixed_width(item_width, wrap_mode)
                 }
             };
@@ -200,7 +198,7 @@ impl Layout for Menu {
                 if h < item_measurements.dim.height || index == self.items.len() - 1 {
                     item_measurements.dim.height = h;
                 }
-                height = Some(h.saturating_sub(item_measurements.dim.height))
+                height = Some(h.saturating_sub(item_measurements.dim.height));
             }
             dim = dim.vertical_union(item_measurements.dim);
             children.push(item_measurements);
@@ -227,12 +225,9 @@ impl Layout for Menu {
                         measurements.clone(),
                     );
                     y += ctxt.options.dim.height;
-                    match self.layout_item(item, ctxt) {
-                        Some(layout) => children.push(layout),
-                        _ => {
-                            ok = false;
-                            break;
-                        }
+                    if let Some(layout) = self.layout_item(item, ctxt) { children.push(layout) } else {
+                        ok = false;
+                        break;
                     }
                 }
                 if !ok {

@@ -28,6 +28,7 @@ impl LayoutContext {
     ///
     /// # Returns
     /// A new [`LayoutContext`]
+    #[must_use] 
     pub fn new(options: LayoutOptions, measurements: Measurements) -> Self {
         Self {
             options,
@@ -64,6 +65,7 @@ impl LayoutContext {
     ///     Some(Rect::new(1, 0, Dimension::new(4, 5)))
     /// ));
     /// ```
+    #[must_use] 
     pub fn new_with_intersection(
         options: &LayoutOptions,
         x: usize,
@@ -77,9 +79,9 @@ impl LayoutContext {
     }
 }
 
-impl Into<LayoutOptions> for LayoutContext {
-    fn into(self) -> LayoutOptions {
-        self.options
+impl From<LayoutContext> for LayoutOptions {
+    fn from(val: LayoutContext) -> Self {
+        val.options
     }
 }
 

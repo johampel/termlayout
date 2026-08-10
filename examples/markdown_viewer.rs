@@ -1,6 +1,13 @@
-//! Example demonstrating the [`Markdown`](crate::widgets::Markdown) widget.
-//! It is an interactive example that shows the content of a markdown file; using a simple menu
-//! you may change the file interactively when the example runs.
+//! Example demonstrating the [`Markdown`](termlayout::widgets::Markdown) widget.
+//!
+//! It is an interactive example that renders a Markdown file to the terminal. Using a simple menu
+//! you may switch the file and toggle between light and dark colour themes interactively while the
+//! example is running.
+//!
+//! You can run this example using:
+//! ```bash
+//! cargo run --example markdown_viewer --features markdown
+//! ```
 
 use std::borrow::Cow;
 use std::fs;

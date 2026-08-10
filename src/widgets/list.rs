@@ -245,7 +245,7 @@ impl List {
         }
     }
 
-    fn measure_item(item: RcLayout, marker_width: usize, mode: MeasureMode) -> Measurements {
+    fn measure_item(item: &RcLayout, marker_width: usize, mode: MeasureMode) -> Measurements {
         let content_measurements = item.measure(mode);
         let marker_measurements: Measurements =
             Dimension::new(marker_width, content_measurements.dim.height).into();
@@ -282,19 +282,17 @@ impl Layout for List {
                 MeasureMode::PrefWidth { wrap_mode, .. } => {
                     MeasureMode::pref_width(item_width, wrap_mode)
                 }
-                MeasureMode::FixedWidth { wrap_mode, .. } => {
-                    MeasureMode::fixed_width(item_width, wrap_mode)
-                }
-                MeasureMode::Exact { wrap_mode, .. } => {
+                MeasureMode::FixedWidth { wrap_mode, .. }
+                | MeasureMode::Exact { wrap_mode, .. } => {
                     MeasureMode::fixed_width(item_width, wrap_mode)
                 }
             };
-            let mut item_measurements = Self::measure_item(item.clone(), marker_width, item_mode);
+            let mut item_measurements = Self::measure_item(item, marker_width, item_mode);
             if let Some(h) = height {
                 if h < item_measurements.dim.height || index == self.items.len() - 1 {
                     item_measurements.dim.height = h;
                 }
-                height = Some(h.saturating_sub(item_measurements.dim.height))
+                height = Some(h.saturating_sub(item_measurements.dim.height));
             }
             dim = dim.vertical_union(item_measurements.dim);
             children.push(item_measurements);
@@ -323,12 +321,9 @@ impl Layout for List {
                         measurements.clone(),
                     );
                     y += ctxt.options.dim.height;
-                    match self.layout_item(index, item.clone(), ctxt) {
-                        Some(layout) => children.push(layout),
-                        _ => {
-                            ok = false;
-                            break;
-                        }
+                    if let Some(layout) = self.layout_item(index, item.clone(), ctxt) { children.push(layout) } else {
+                        ok = false;
+                        break;
                     }
                 }
                 if !ok {

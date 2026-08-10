@@ -149,10 +149,8 @@ impl Layout for Tree {
                     MeasureMode::PrefWidth { wrap_mode, .. } => {
                         MeasureMode::pref_width(item_width, wrap_mode)
                     }
-                    MeasureMode::FixedWidth { wrap_mode, .. } => {
-                        MeasureMode::fixed_width(item_width, wrap_mode)
-                    }
-                    MeasureMode::Exact { wrap_mode, .. } => {
+                    MeasureMode::FixedWidth { wrap_mode, .. }
+                    | MeasureMode::Exact { wrap_mode, .. } => {
                         MeasureMode::fixed_width(item_width, wrap_mode)
                     }
                 };
@@ -161,7 +159,7 @@ impl Layout for Tree {
                     if path.last_of_all() {
                         measurements.dim.height = h;
                     }
-                    height = Some(h - measurements.dim.height)
+                    height = Some(h - measurements.dim.height);
                 }
                 let node_dim = Dimension::new(
                     measurements.dim.width + prefix_width,
@@ -295,11 +293,10 @@ impl TreeNode {
         T: FnMut(&TreePath) -> bool,
     {
         let path = TreePath::new(self, true, None);
-        if include_self {
-            if !callback(&path) {
+        if include_self
+            && !callback(&path) {
                 return false;
             }
-        }
         path.traverse_children(&mut callback)
     }
 }
@@ -366,7 +363,7 @@ impl<'a> TreePath<'a> {
     }
 
     fn last_of_all(&self) -> bool {
-        self.last_child && self.node.children.is_empty() && self.parent.map(|p| p.last_of_all()).unwrap_or(true)
+        self.last_child && self.node.children.is_empty() && self.parent.is_none_or(TreePath::last_of_all)
     }
 }
 

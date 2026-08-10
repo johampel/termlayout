@@ -232,7 +232,7 @@ impl Layout for Lines {
     }
 
     fn layout_with_context(&'_ self, context: LayoutContext) -> BoxedFormattedLayout<'_> {
-        FormattedLines::new(&self, context.into()).into()
+        FormattedLines::new(self, context.into()).into()
     }
 
     fn as_any(&self) -> &dyn Any {

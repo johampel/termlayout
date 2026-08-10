@@ -51,7 +51,7 @@ use std::rc::Rc;
 ///
 /// ```
 /// Note that the picture above represents a simplified view - internally the overall picture is a
-/// little bit more complex, since `layout_strict` calls `measure
+/// little bit more complex, since `layout_strict` calls `measure`.
 /// # Examples
 /// The following example shows a typical usage:
 /// ```rust
@@ -398,7 +398,7 @@ pub trait LayoutWriter<'wrt> {
     /// In detail, the following things should be done:
     /// * It should write all data for the current row to the `Write`;
     ///   always *without* any new line and *never* more characters than defined in the
-    ///   [width](Dimension::width) of the associated [`LayoutOptions`] dimension.
+    ///   `width` of the associated [`LayoutOptions`] dimension.
     /// * If the actual output is smaller than the width but [`fill_rows`](LayoutOptions::fill_rows)
     ///   is set to `true`, the rest of the available width must be filled with spaces.
     ///

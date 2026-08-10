@@ -95,7 +95,7 @@ impl<'a> TableMetrics<'a> {
                 let cell_dim = Dimension::new(self.widths[col], self.heights[row]);
                 let mut measurements = self.measurements[row * self.table.cols + col].clone();
                 if self.table.is_deco(row, col) {
-                    measurements.dim = cell_dim
+                    measurements.dim = cell_dim;
                 }
                 let  content_dim = measurements.dim;
                 (
@@ -125,23 +125,19 @@ impl<'a> TableMetrics<'a> {
         let mut fixed_width = 0;
         for col in 0..self.table.cols {
             let table_col = self.table.table_column_at(col).unwrap();
-            if table_col.width != CellWidth::Fill {
+            if table_col.width == CellWidth::Fill {
+                fill_count += 1;
+            } else {
                 self.widths[col] = self.measure_column_width(col, table_col.width, mode);
                 fixed_width += self.widths[col];
-            } else {
-                fill_count += 1;
             }
         }
 
         // 2. Step: Compute the widths of those cells with width == Fill
         if fill_count > 0 {
-            // fill_with is None or Some width to fill, dependeing on the mode
+            // fill_width is None or Some width to fill, depending on the mode
             let mut fill_width = mode.width().map(|max_width| {
-                if fixed_width + fill_count > max_width {
-                    max_width - fixed_width % max_width
-                } else {
-                    max_width - fixed_width
-                }
+                max_width.saturating_sub(fixed_width)
             });
             for col in 0..self.table.cols {
                 let table_col = self.table.table_column_at(col).unwrap();
@@ -150,7 +146,7 @@ impl<'a> TableMetrics<'a> {
                 }
                 match fill_width {
                     Some(width) => {
-                        self.widths[col] = max(1, width / fill_count);
+                        self.widths[col] = width.checked_div(fill_count).map_or(1, |w| w.max(1));
                         fill_width = Some(width - self.widths[col]);
                         fill_count -= 1;
                     }
@@ -164,10 +160,11 @@ impl<'a> TableMetrics<'a> {
 
     fn measure_column_width(&self, col: usize, cell_width: CellWidth, mode: MeasureMode) -> usize {
         match cell_width {
-            CellWidth::Fixed(width) => width,
-            CellWidth::Preferred(width) => width,
+            CellWidth::Fixed(width) | CellWidth::Preferred(width) => width,
             CellWidth::Proportional(weight) if mode.width().is_some() => {
-                (mode.width().unwrap() as f32 * weight) as usize
+                #[allow(clippy::cast_precision_loss, clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+                let w = (mode.width().unwrap() as f32 * weight) as usize;
+                w
             }
             CellWidth::Fill if mode.width().is_some() => 0, // Computed differently
             _ => {

@@ -64,7 +64,7 @@ termlayout = { version = "0.1.0", features = ["markdown"] }
 
 ### Layout System
 
-- Automatic dimension calculation (`pref_dim`, `min_dim`)
+- Automatic dimension calculation via [`measure()`](https://docs.rs/termlayout/latest/termlayout/trait.Layout.html#tymethod.measure)
 - Multiple wrap modes: `Truncate` with suffix, or `Wrap` to next line
 - Clipping support for constrained areas
 - Flexible column sizing: `Fixed`, `Minimal`, `Fill`, `Relative`
@@ -147,26 +147,25 @@ fn main() {
 Create your own widgets by implementing the `Layout` trait:
 
 ```rust
+use std::any::Any;
 use termlayout::*;
+use termlayout::widgets::Lines;
 
 struct MyWidget {
     content: String,
 }
 
 impl Layout for MyWidget {
-    fn pref_dim(&self, max_width: usize, wrap_mode: WrapMode) -> Dimension {
-        // Calculate preferred dimensions
-        Dimension::new(max_width.min(self.content.len()), 1)
+    fn measure(&self, mode: MeasureMode) -> Measurements {
+        let width = mode.coerce_width(self.content.len());
+        Measurements::from(Dimension::new(width, 1))
     }
 
-    fn min_dim(&self) -> Dimension {
-        Dimension::new(self.content.len(), 1)
+    fn layout_with_context(&self, context: LayoutContext) -> BoxedFormattedLayout<'_> {
+        Lines::left(&self.content).layout_with_context(context)
     }
 
-    fn layout_strict(&self, options: LayoutOptions) -> BoxedFormattedLayout {
-        // Implement layout logic
-        todo!()
-    }
+    fn as_any(&self) -> &dyn Any { self }
 }
 ```
 
