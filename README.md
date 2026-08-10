@@ -218,6 +218,26 @@ cargo doc --open
 cargo clippy --all-features
 ```
 
+### Run Benchmarks
+
+The benchmark suite uses [Criterion](https://bheisler.github.io/criterion.rs/book/) and covers
+all widgets (`Lines`, `Paragraph`, `Filler`, `Cell`, `Frame`, `Horizontal`, `Vertical`, `Table`,
+`Tree`, `List`, `Menu`). Each widget is benchmarked for both the sizing pass (`measure`) and the
+full render pipeline (`layout` + string formatting).
+
+```bash
+# Run all benchmarks
+cargo bench
+
+# Run benchmarks for a specific widget (e.g. table)
+cargo bench -- table
+
+# Verify benchmarks compile and execute without timing them
+cargo bench -- --test
+```
+
+Criterion writes an HTML report to `target/criterion/report/index.html` after each run.
+
 ## Contributing
 
 Contributions are welcome! Please feel free to submit a Pull Request.
