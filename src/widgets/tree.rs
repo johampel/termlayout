@@ -293,10 +293,9 @@ impl TreeNode {
         T: FnMut(&TreePath) -> bool,
     {
         let path = TreePath::new(self, true, None);
-        if include_self
-            && !callback(&path) {
-                return false;
-            }
+        if include_self && !callback(&path) {
+            return false;
+        }
         path.traverse_children(&mut callback)
     }
 }
@@ -363,15 +362,17 @@ impl<'a> TreePath<'a> {
     }
 
     fn last_of_all(&self) -> bool {
-        self.last_child && self.node.children.is_empty() && self.parent.is_none_or(TreePath::last_of_all)
+        self.last_child
+            && self.node.children.is_empty()
+            && self.parent.is_none_or(TreePath::last_of_all)
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{LayoutOptions, Rect, WrapMode};
     use crate::widgets::Lines;
+    use crate::{LayoutOptions, Rect, WrapMode};
 
     fn sample_nodes() -> TreeNode {
         TreeNode::new(

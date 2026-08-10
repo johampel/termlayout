@@ -225,7 +225,9 @@ impl Layout for Menu {
                         measurements.clone(),
                     );
                     y += ctxt.options.dim.height;
-                    if let Some(layout) = self.layout_item(item, ctxt) { children.push(layout) } else {
+                    if let Some(layout) = self.layout_item(item, ctxt) {
+                        children.push(layout);
+                    } else {
                         ok = false;
                         break;
                     }

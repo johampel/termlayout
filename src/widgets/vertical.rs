@@ -4,8 +4,7 @@ use crate::ext::{
 };
 use crate::ext::{BoxedFormattedLayout, box_formatted_layout, rc_layout};
 use crate::{
-    Dimension, Layout, LayoutContext, LayoutOptions, MeasureMode, Measurements, RcLayout,
-    WrapMode,
+    Dimension, Layout, LayoutContext, LayoutOptions, MeasureMode, Measurements, RcLayout, WrapMode,
 };
 use std::any::Any;
 use std::fmt::Write;
@@ -63,7 +62,8 @@ impl Vertical {
                 break;
             }
             let measurement = if index + 1 < self.content.len() {
-                let measurement = item.measure(MeasureMode::fixed_width(dimension.width, wrap_mode));
+                let measurement =
+                    item.measure(MeasureMode::fixed_width(dimension.width, wrap_mode));
                 if measurement.dim.height > height {
                     item.measure(MeasureMode::exact(
                         Dimension::new(dimension.width, height),
@@ -100,15 +100,14 @@ impl Default for Vertical {
 impl Layout for Vertical {
     fn measure(&self, mode: MeasureMode) -> Measurements {
         if mode.is_empty() {
-            return Measurements::empty()
-                .with_specifics(MeasurementSpecifics::Children(vec![]));
+            return Measurements::empty().with_specifics(MeasurementSpecifics::Children(vec![]));
         }
         match mode {
             MeasureMode::Exact {
                 dimension,
                 wrap_mode,
             } => self.measure_exact(dimension, wrap_mode),
-            _ => Measurements::fold_vertically(self.content.iter(), mode)
+            _ => Measurements::fold_vertically(self.content.iter(), mode),
         }
     }
 
@@ -117,9 +116,13 @@ impl Layout for Vertical {
         match specifics {
             Ok(child_measurements) => {
                 let mut y = 0;
-                let children = self.content.iter().zip(child_measurements.iter())
+                let children = self
+                    .content
+                    .iter()
+                    .zip(child_measurements.iter())
                     .map(|(l, m)| {
-                        let ctxt = LayoutContext::new_with_intersection(&context.options, 0, y, m.clone());
+                        let ctxt =
+                            LayoutContext::new_with_intersection(&context.options, 0, y, m.clone());
                         y += ctxt.options.dim.height;
                         l.layout_with_context(ctxt)
                     })
@@ -222,8 +225,8 @@ impl<'wrt> LayoutWriter<'wrt> for VerticalWriter<'wrt> {
 
 #[cfg(test)]
 mod tests {
-    use crate::Rect;
     use super::*;
+    use crate::Rect;
     use crate::widgets::Lines;
 
     #[test]
@@ -235,39 +238,78 @@ mod tests {
         let vertical = Vertical::new(vec![lines1, lines2, lines3]);
 
         // Wrap case
-        assert_eq!(vertical.measure(MeasureMode::pref_width(30, WrapMode::Wrap)).dim, Dimension::new(30, 7));
-        assert_eq!(vertical.measure(MeasureMode::pref_width(25, WrapMode::Wrap)).dim, Dimension::new(25, 8));
         assert_eq!(
-            vertical.measure(MeasureMode::pref_width(15, WrapMode::Wrap)).dim,
-            Dimension::new(15, 10)
-        );
-        assert_eq!(vertical.measure(MeasureMode::pref_width(5, WrapMode::Wrap)).dim, Dimension::new(5, 21));
-        assert_eq!(vertical.measure(MeasureMode::pref_width(1, WrapMode::Wrap)).dim, Dimension::new(1, 94));
-        assert_eq!(vertical.measure(MeasureMode::pref_width(0, WrapMode::Wrap)).dim, Dimension::empty());
-
-        // Truncate case
-        assert_eq!(
-            vertical.measure(MeasureMode::pref_width(30, WrapMode::Truncate("..."))).dim,
+            vertical
+                .measure(MeasureMode::pref_width(30, WrapMode::Wrap))
+                .dim,
             Dimension::new(30, 7)
         );
         assert_eq!(
-            vertical.measure(MeasureMode::pref_width(25, WrapMode::Truncate("..."))).dim,
+            vertical
+                .measure(MeasureMode::pref_width(25, WrapMode::Wrap))
+                .dim,
+            Dimension::new(25, 8)
+        );
+        assert_eq!(
+            vertical
+                .measure(MeasureMode::pref_width(15, WrapMode::Wrap))
+                .dim,
+            Dimension::new(15, 10)
+        );
+        assert_eq!(
+            vertical
+                .measure(MeasureMode::pref_width(5, WrapMode::Wrap))
+                .dim,
+            Dimension::new(5, 21)
+        );
+        assert_eq!(
+            vertical
+                .measure(MeasureMode::pref_width(1, WrapMode::Wrap))
+                .dim,
+            Dimension::new(1, 94)
+        );
+        assert_eq!(
+            vertical
+                .measure(MeasureMode::pref_width(0, WrapMode::Wrap))
+                .dim,
+            Dimension::empty()
+        );
+
+        // Truncate case
+        assert_eq!(
+            vertical
+                .measure(MeasureMode::pref_width(30, WrapMode::Truncate("...")))
+                .dim,
+            Dimension::new(30, 7)
+        );
+        assert_eq!(
+            vertical
+                .measure(MeasureMode::pref_width(25, WrapMode::Truncate("...")))
+                .dim,
             Dimension::new(25, 7)
         );
         assert_eq!(
-            vertical.measure(MeasureMode::pref_width(15, WrapMode::Truncate("..."))).dim,
+            vertical
+                .measure(MeasureMode::pref_width(15, WrapMode::Truncate("...")))
+                .dim,
             Dimension::new(15, 7)
         );
         assert_eq!(
-            vertical.measure(MeasureMode::pref_width(5, WrapMode::Truncate("..."))).dim,
+            vertical
+                .measure(MeasureMode::pref_width(5, WrapMode::Truncate("...")))
+                .dim,
             Dimension::new(5, 7)
         );
         assert_eq!(
-            vertical.measure(MeasureMode::pref_width(1, WrapMode::Truncate("..."))).dim,
+            vertical
+                .measure(MeasureMode::pref_width(1, WrapMode::Truncate("...")))
+                .dim,
             Dimension::new(1, 7)
         );
         assert_eq!(
-            vertical.measure(MeasureMode::pref_width(0, WrapMode::Truncate("..."))).dim,
+            vertical
+                .measure(MeasureMode::pref_width(0, WrapMode::Truncate("...")))
+                .dim,
             Dimension::empty()
         );
     }
@@ -280,7 +322,10 @@ mod tests {
         let lines3 = Lines::right(concat!("Life\n", "is\n", "life."));
         let vertical = Vertical::new(vec![lines1, lines2, lines3]);
 
-        assert_eq!(vertical.measure(MeasureMode::min()).dim, Dimension::new(30, 7));
+        assert_eq!(
+            vertical.measure(MeasureMode::min()).dim,
+            Dimension::new(30, 7)
+        );
     }
 
     #[test]

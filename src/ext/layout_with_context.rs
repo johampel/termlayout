@@ -30,7 +30,7 @@ impl LayoutWithContext {
             context,
             formatted_builder: |lyt, ctxt| lyt.layout_with_context(ctxt.clone()),
         }
-            .build()
+        .build()
     }
 }
 

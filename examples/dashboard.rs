@@ -8,8 +8,8 @@
 
 use termlayout::ext::{Color, Effect, Style, TextBuilder};
 use termlayout::widgets::{
-    Cell, CellAnchor, CellWidth, Filler, Frame, FrameDecoration, Horizontal, Lines, List, Paragraph,
-    Table, TableColumn, TableDecoration, Vertical,
+    Cell, CellAnchor, CellWidth, Filler, Frame, FrameDecoration, Horizontal, Lines, List,
+    Paragraph, Table, TableColumn, TableDecoration, Vertical,
 };
 use termlayout::{Layout, RcLayout, WrapMode};
 
@@ -32,7 +32,7 @@ fn main() {
     header_builder.pop_last_style();
     header_builder.push_style(Style::default().with_foreground(Color::Yellow));
     header_builder.append("Status: ONLINE ");
-    
+
     // Convert current builder content to layout
     let header_text = Lines::center(header_builder.as_ref().to_string());
     let header_separator = Filler::horizontal("═");
@@ -41,22 +41,38 @@ fn main() {
     // Quick statistics with colored badges using TextBuilder
     let mut item1 = TextBuilder::new();
     item1.append("CPU Usage:  ");
-    item1.push_style(Style::default().with_foreground(Color::Green).with_effect(Effect::Bold));
+    item1.push_style(
+        Style::default()
+            .with_foreground(Color::Green)
+            .with_effect(Effect::Bold),
+    );
     item1.append("⚡ 14% ");
 
     let mut item2 = TextBuilder::new();
     item2.append("Memory:     ");
-    item2.push_style(Style::default().with_foreground(Color::Green).with_effect(Effect::Bold));
+    item2.push_style(
+        Style::default()
+            .with_foreground(Color::Green)
+            .with_effect(Effect::Bold),
+    );
     item2.append("📟 4.2/16 GB ");
 
     let mut item3 = TextBuilder::new();
     item3.append("Disk Space: ");
-    item3.push_style(Style::default().with_foreground(Color::Yellow).with_effect(Effect::Bold));
+    item3.push_style(
+        Style::default()
+            .with_foreground(Color::Yellow)
+            .with_effect(Effect::Bold),
+    );
     item3.append("💾 74% ");
 
     let mut item4 = TextBuilder::new();
     item4.append("Network:    ");
-    item4.push_style(Style::default().with_foreground(Color::Green).with_effect(Effect::Bold));
+    item4.push_style(
+        Style::default()
+            .with_foreground(Color::Green)
+            .with_effect(Effect::Bold),
+    );
     item4.append("📶 Up ");
 
     let stats_list = List::fixed(vec![
@@ -121,7 +137,11 @@ fn main() {
                 status_builder.append("○ Idle");
             }
             _ => {
-                status_builder.push_style(Style::default().with_foreground(Color::White).with_effect(Effect::Dim));
+                status_builder.push_style(
+                    Style::default()
+                        .with_foreground(Color::White)
+                        .with_effect(Effect::Dim),
+                );
                 status_builder.append("◌ Finished");
             }
         }
@@ -130,11 +150,7 @@ fn main() {
         table_rows.push(vec![pid.into(), name.into(), cpu.into(), status.into()]);
     }
 
-    let process_table = Table::new(
-        TableDecoration::boxed_grid(),
-        table_columns,
-        table_rows,
-    );
+    let process_table = Table::new(TableDecoration::boxed_grid(), table_columns, table_rows);
 
     let details_panel = Frame::new(
         FrameDecoration::boxed(),
@@ -151,17 +167,29 @@ fn main() {
 
     // 5. Build a styled Footer with hotkey hints
     let mut footer_builder = TextBuilder::new();
-    footer_builder.push_style(Style::default().with_foreground(Color::Cyan).with_effect(Effect::Bold));
+    footer_builder.push_style(
+        Style::default()
+            .with_foreground(Color::Cyan)
+            .with_effect(Effect::Bold),
+    );
     footer_builder.append(" [Q] ");
     footer_builder.pop_last_style();
     footer_builder.append("Quit   ");
-    
-    footer_builder.push_style(Style::default().with_foreground(Color::Cyan).with_effect(Effect::Bold));
+
+    footer_builder.push_style(
+        Style::default()
+            .with_foreground(Color::Cyan)
+            .with_effect(Effect::Bold),
+    );
     footer_builder.append(" [R] ");
     footer_builder.pop_last_style();
     footer_builder.append("Refresh   ");
-    
-    footer_builder.push_style(Style::default().with_foreground(Color::Cyan).with_effect(Effect::Bold));
+
+    footer_builder.push_style(
+        Style::default()
+            .with_foreground(Color::Cyan)
+            .with_effect(Effect::Bold),
+    );
     footer_builder.append(" [S] ");
     footer_builder.pop_last_style();
     footer_builder.append("Settings   ");

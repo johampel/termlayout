@@ -473,8 +473,8 @@ impl From<Dimension> for Measurements {
 /// of this enum. Instead, several widget types can share the same variant.
 #[derive(Clone)]
 pub enum MeasurementSpecifics {
-    /// Represents the case that there is no further specific information 
-    /// available for this measurement. Typically, widgets like `Lines`, 
+    /// Represents the case that there is no further specific information
+    /// available for this measurement. Typically, widgets like `Lines`,
     /// `Filler`, or `Paragraph` have no further information.
     None,
     /// Represents the case with exactly one child measurement. This
@@ -491,21 +491,20 @@ pub enum MeasurementSpecifics {
 }
 
 impl MeasurementSpecifics {
-    
     /// Returns `true`, if this instance is `None`.
-    /// 
+    ///
     /// # Returns
     /// `true`, if this instance is `None`.
-    #[must_use] 
+    #[must_use]
     pub fn is_none(&self) -> bool {
         matches!(self, Self::None)
     }
 
     /// Returns - if present - a list of child [`Measurements`].
-    /// 
+    ///
     /// # Returns
     /// A slice of [`Measurements`] or `None`, if the variant is not `Children`.
-    #[must_use] 
+    #[must_use]
     pub fn children(&self) -> Option<&[Measurements]> {
         match self {
             MeasurementSpecifics::Children(children) => Some(children),
@@ -517,7 +516,7 @@ impl MeasurementSpecifics {
     ///
     /// # Returns
     /// A s[`Measurements`] or `None`, if the variant is not `Child`.
-    #[must_use] 
+    #[must_use]
     pub fn child(&self) -> Option<&Measurements> {
         match self {
             MeasurementSpecifics::Child(child) => Some(child.as_ref()),
@@ -529,7 +528,7 @@ impl MeasurementSpecifics {
     ///
     /// # Returns
     /// A slice of [`Row`](crate::ext::Row)s or `None`, if the variant is not `Rows`.
-    #[must_use] 
+    #[must_use]
     pub fn rows(&self) -> Option<&[Row]> {
         match self {
             MeasurementSpecifics::Rows(rows) => Some(rows),

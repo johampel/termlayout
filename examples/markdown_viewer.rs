@@ -27,7 +27,6 @@ static FILENAME: Mutex<Cow<str>> = Mutex::new(Cow::Borrowed("examples/doc/EXAMPL
 /// when the example runs.
 static DARK_STYLE: Mutex<bool> = Mutex::new(true);
 
-
 /// This is the code you need to load a file and display its content as markdown.
 fn show_example() {
     // Open the file and read its content.
@@ -37,7 +36,7 @@ fn show_example() {
             // Create the markdown widget with the content and the appropriate configuration.
             let config = match *DARK_STYLE.lock().unwrap() {
                 true => &MarkdownConfig::dark(),
-                false => &MarkdownConfig::light()
+                false => &MarkdownConfig::light(),
             };
             let markdown = Markdown::with_config(content, config);
 
@@ -54,15 +53,18 @@ fn show_example() {
     }
 }
 
-
 /// Returns a [`MenuItem`] that allows the user to select a file to show.
 fn select_file() -> MenuItem {
     let filename = (*FILENAME.lock().unwrap()).to_string();
-    MenuItem::new('f', format!("Select file to show (current: {filename})"), || {
-        let filename = Menu::prompt("Enter file name");
-        *FILENAME.lock().unwrap() = filename.to_string().into();
-        true
-    })
+    MenuItem::new(
+        'f',
+        format!("Select file to show (current: {filename})"),
+        || {
+            let filename = Menu::prompt("Enter file name");
+            *FILENAME.lock().unwrap() = filename.to_string().into();
+            true
+        },
+    )
 }
 
 /// Returns a [`MenuItem`] that allows the user to toggle between light and dark style.
@@ -72,12 +74,15 @@ fn toggle_style() -> MenuItem {
         true => String::from("dark"),
         false => String::from("light"),
     };
-    MenuItem::new('s', format!("Toggle between light and dark style (current: {style_name})"), || {
-        let style = *DARK_STYLE.lock().unwrap();
-        *DARK_STYLE.lock().unwrap() = (!style).into();
-        true
-    })
-
+    MenuItem::new(
+        's',
+        format!("Toggle between light and dark style (current: {style_name})"),
+        || {
+            let style = *DARK_STYLE.lock().unwrap();
+            *DARK_STYLE.lock().unwrap() = (!style).into();
+            true
+        },
+    )
 }
 
 /// Main.
@@ -95,7 +100,8 @@ fn main() {
             select_file(),
             toggle_style(),
             MenuItem::options(),
-            MenuItem::quit()]);
+            MenuItem::quit(),
+        ]);
         menu.show_and_handle_menu();
     }
 }

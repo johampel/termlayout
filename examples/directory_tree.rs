@@ -13,8 +13,8 @@ use std::borrow::Cow;
 use std::fs;
 use std::path::Path;
 use std::sync::Mutex;
-use termlayout::widgets::{Paragraph, Tree, TreeDecoration, TreeNode};
 use termlayout::Layout;
+use termlayout::widgets::{Paragraph, Tree, TreeDecoration, TreeNode};
 
 #[path = "shared/mod.rs"]
 mod shared;
@@ -109,11 +109,7 @@ fn main() {
 
         show_example();
 
-        let menu = Menu::new(&[
-            select_directory(),
-            MenuItem::options(),
-            MenuItem::quit(),
-        ]);
+        let menu = Menu::new(&[select_directory(), MenuItem::options(), MenuItem::quit()]);
         menu.show_and_handle_menu();
     }
 }

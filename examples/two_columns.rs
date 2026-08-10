@@ -15,7 +15,10 @@
 use std::any::Any;
 use termlayout::ext::{DisplayStr, LayoutWithContext};
 use termlayout::widgets::{Cell, Filler, Horizontal, Lines};
-use termlayout::{BoxedFormattedLayout, Dimension, Layout, LayoutContext, MeasureMode, Measurements, RcLayout, WrapMode};
+use termlayout::{
+    BoxedFormattedLayout, Dimension, Layout, LayoutContext, MeasureMode, Measurements, RcLayout,
+    WrapMode,
+};
 
 #[path = "shared/mod.rs"]
 mod shared;
@@ -70,7 +73,10 @@ impl Layout for TwoColumns {
                 )
                 .into()
             }
-            MeasureMode::PrefWidth { max_width, wrap_mode } => {
+            MeasureMode::PrefWidth {
+                max_width,
+                wrap_mode,
+            } => {
                 if self.can_display_with_two_columns(max_width) {
                     let col_width = (max_width - self.spacer.display_len()) / 2;
                     let dim = self
@@ -103,11 +109,16 @@ impl Layout for TwoColumns {
     }
 
     fn layout_with_context(&'_ self, context: LayoutContext) -> BoxedFormattedLayout<'_> {
-        let LayoutContext { options, measurements } = context;
+        let LayoutContext {
+            options,
+            measurements,
+        } = context;
 
         // if there is not enough space for two columns, we just display the content in one column
         if !self.can_display_with_two_columns(options.dim.width) {
-            return self.content.layout_with_context(LayoutContext::new(options, measurements));
+            return self
+                .content
+                .layout_with_context(LayoutContext::new(options, measurements));
         }
 
         // Compute the dimension of the content. This is basically the half of the available width

@@ -67,7 +67,6 @@ use std::rc::Rc;
 ///     ));
 /// ```
 pub trait Layout {
-
     /// Computes the [`Measurements`] of this instance based on the given `mode`.
     /// The [`Measurements`] contains at least the overall dimension of the `Layout`, but it might
     /// contain also information about nested objects.
@@ -128,7 +127,7 @@ pub trait Layout {
     /// assert_eq!(measurements.dim, Dimension::new(13, 2));
     /// ```
     fn measure(&self, mode: MeasureMode) -> Measurements;
-    
+
     /// Generates a [`FormattedLayout`] so that the content does not exceed `max_width` columns
     /// and is wrapped if required.
     ///
@@ -187,12 +186,7 @@ pub trait Layout {
         wrap_mode: WrapMode,
     ) -> BoxedFormattedLayout<'_> {
         let measurements = self.measure(MeasureMode::pref_width(max_width, wrap_mode));
-        let options = LayoutOptions::new(
-            measurements.dim,
-            false,
-            wrap_mode,
-            None
-        );
+        let options = LayoutOptions::new(measurements.dim, false, wrap_mode, None);
         self.layout_with_context(LayoutContext::new(options, measurements))
     }
 

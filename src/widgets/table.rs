@@ -2,7 +2,10 @@ use crate::ext::Row;
 use crate::widgets::table::decoration::DecoratedTable;
 use crate::widgets::table::metrics::TableMetrics;
 use crate::widgets::{CellAnchor, CellWidth, TableDecoration};
-use crate::{BoxedFormattedLayout, Dimension, Layout, LayoutContext, MeasureMode, MeasurementSpecifics, Measurements, RcLayout, WrapMode, rc_layout};
+use crate::{
+    BoxedFormattedLayout, Dimension, Layout, LayoutContext, MeasureMode, MeasurementSpecifics,
+    Measurements, RcLayout, WrapMode, rc_layout,
+};
 use std::any::Any;
 
 pub(crate) mod decoration;
@@ -71,7 +74,8 @@ impl Layout for Table {
         let table = DecoratedTable::new(self);
         let metrics = TableMetrics::new(&table, mode);
         let rows = metrics.all_rows(mode);
-        let dim = rows.iter()
+        let dim = rows
+            .iter()
             .map(|row| row.dim)
             .fold(Dimension::empty(), |acc, dim| acc.vertical_union(dim));
         Measurements::new(dim, MeasurementSpecifics::Rows(rows))
@@ -80,7 +84,7 @@ impl Layout for Table {
     fn layout_with_context(&'_ self, context: LayoutContext) -> BoxedFormattedLayout<'_> {
         match &context.measurements.specifics {
             MeasurementSpecifics::Rows(_) => Row::layout(context).unwrap(),
-            _ => self.layout_strict(context.options)
+            _ => self.layout_strict(context.options),
         }
     }
 

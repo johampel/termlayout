@@ -30,7 +30,7 @@ impl HorizontalMetrics {
     ///
     /// # Returns
     /// The resulting [`HorizontalMetrics`].
-    #[must_use] 
+    #[must_use]
     pub fn from_cells(cells: &[Cell], mode: MeasureMode) -> Self {
         let max_height = mode.height();
         // Build a row containing all cells
@@ -67,7 +67,7 @@ impl HorizontalMetrics {
     ///
     /// # Returns
     /// The resulting [`HorizontalMetrics`].
-    #[must_use] 
+    #[must_use]
     pub fn from_row(
         row: Row,
         wrap_mode: WrapMode,

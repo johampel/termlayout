@@ -3,7 +3,9 @@ pub(crate) mod config;
 mod handler;
 
 use crate::widgets::markdown::handler::Handler;
-use crate::{BoxedFormattedLayout, Layout, LayoutContext, MeasureMode, Measurements, RcLayout, rc_layout};
+use crate::{
+    BoxedFormattedLayout, Layout, LayoutContext, MeasureMode, Measurements, RcLayout, rc_layout,
+};
 pub use config::FrameConfig;
 pub use config::MarkdownConfig;
 use pulldown_cmark::{Options, Parser};

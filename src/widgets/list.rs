@@ -321,7 +321,9 @@ impl Layout for List {
                         measurements.clone(),
                     );
                     y += ctxt.options.dim.height;
-                    if let Some(layout) = self.layout_item(index, item.clone(), ctxt) { children.push(layout) } else {
+                    if let Some(layout) = self.layout_item(index, item.clone(), ctxt) {
+                        children.push(layout);
+                    } else {
                         ok = false;
                         break;
                     }

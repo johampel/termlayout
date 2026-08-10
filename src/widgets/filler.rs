@@ -133,9 +133,11 @@ impl Layout for Filler {
         }
         match mode {
             MeasureMode::Min => Dimension::new(self.pattern.display_len(), 1).into(),
-            MeasureMode::PrefWidth { max_width,.. } => Dimension::new(min(self.pattern.display_len(), max_width), 1).into(),
+            MeasureMode::PrefWidth { max_width, .. } => {
+                Dimension::new(min(self.pattern.display_len(), max_width), 1).into()
+            }
             MeasureMode::FixedWidth { width, .. } => Dimension::new(width, 1).into(),
-            MeasureMode::Exact { dimension,.. } => dimension.into(),
+            MeasureMode::Exact { dimension, .. } => dimension.into(),
         }
     }
 
@@ -935,18 +937,36 @@ mod tests {
     #[test]
     fn filler_measure_pref() {
         let filler = Filler::both("foobar");
-        assert_eq!(filler.measure(MeasureMode::pref_width(10, WrapMode::default())).dim, Dimension::new(6, 1));
+        assert_eq!(
+            filler
+                .measure(MeasureMode::pref_width(10, WrapMode::default()))
+                .dim,
+            Dimension::new(6, 1)
+        );
     }
 
     #[test]
     fn filler_measure_fixed_width() {
         let filler = Filler::both("foobar");
-        assert_eq!(filler.measure(MeasureMode::fixed_width(10, WrapMode::default())).dim, Dimension::new(10, 1));
+        assert_eq!(
+            filler
+                .measure(MeasureMode::fixed_width(10, WrapMode::default()))
+                .dim,
+            Dimension::new(10, 1)
+        );
     }
 
     #[test]
     fn filler_measure_exact() {
         let filler = Filler::both("foobar");
-        assert_eq!(filler.measure(MeasureMode::exact(Dimension::new(5,3), WrapMode::default())).dim, Dimension::new(5, 3));
+        assert_eq!(
+            filler
+                .measure(MeasureMode::exact(
+                    Dimension::new(5, 3),
+                    WrapMode::default()
+                ))
+                .dim,
+            Dimension::new(5, 3)
+        );
     }
 }

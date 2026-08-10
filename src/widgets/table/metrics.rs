@@ -31,16 +31,16 @@ impl<'a> TableMetrics<'a> {
         this
     }
 
-    pub(crate) fn all_rows(&self,mode: MeasureMode) -> Vec<Row> {
+    pub(crate) fn all_rows(&self, mode: MeasureMode) -> Vec<Row> {
         let mut len = 0;
         let wrap_mode = mode.wrap_mode();
         let mut req_height = mode.height();
         let max_width = mode.coerce_width(usize::MAX);
-        
+
         // First collect all rows
         let mut all_rows = VecDeque::with_capacity(self.table.rows);
         for row in 0..self.table.rows {
-            let  metrics = self.row(row, wrap_mode, max_width, req_height);
+            let metrics = self.row(row, wrap_mode, max_width, req_height);
             if let Some(height) = req_height {
                 req_height = Some(height.saturating_sub(metrics.dim.height));
             }
@@ -97,7 +97,7 @@ impl<'a> TableMetrics<'a> {
                 if self.table.is_deco(row, col) {
                     measurements.dim = cell_dim;
                 }
-                let  content_dim = measurements.dim;
+                let content_dim = measurements.dim;
                 (
                     Cell::new(
                         content,
@@ -109,10 +109,7 @@ impl<'a> TableMetrics<'a> {
                         None,
                         table_colum.anchor,
                     ),
-                    Measurements::new(
-                        cell_dim,
-                        MeasurementSpecifics::Child(measurements.into()),
-                    ),
+                    Measurements::new(cell_dim, MeasurementSpecifics::Child(measurements.into())),
                 )
             })
         });
@@ -136,9 +133,9 @@ impl<'a> TableMetrics<'a> {
         // 2. Step: Compute the widths of those cells with width == Fill
         if fill_count > 0 {
             // fill_width is None or Some width to fill, depending on the mode
-            let mut fill_width = mode.width().map(|max_width| {
-                max_width.saturating_sub(fixed_width)
-            });
+            let mut fill_width = mode
+                .width()
+                .map(|max_width| max_width.saturating_sub(fixed_width));
             for col in 0..self.table.cols {
                 let table_col = self.table.table_column_at(col).unwrap();
                 if table_col.width != CellWidth::Fill {
@@ -162,7 +159,11 @@ impl<'a> TableMetrics<'a> {
         match cell_width {
             CellWidth::Fixed(width) | CellWidth::Preferred(width) => width,
             CellWidth::Proportional(weight) if mode.width().is_some() => {
-                #[allow(clippy::cast_precision_loss, clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+                #[allow(
+                    clippy::cast_precision_loss,
+                    clippy::cast_possible_truncation,
+                    clippy::cast_sign_loss
+                )]
                 let w = (mode.width().unwrap() as f32 * weight) as usize;
                 w
             }

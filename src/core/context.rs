@@ -6,10 +6,10 @@ use crate::{Dimension, Measurements, Rect};
 /// of it to the layout operation, which first calls [`measure`](crate::Layout::measure) to obtain
 /// the [`Measurements`] of the object to layout. This context is simply the union of the
 /// [`LayoutOptions`] and the [`Measurements`].
-/// 
+///
 /// Instances of this type are normally created by the crate itself, it is quite uncommon to create
-/// instances in pure client code, since the caller is responsible that the `options` and 
-/// `measuremnts` fit somehow. 
+/// instances in pure client code, since the caller is responsible that the `options` and
+/// `measuremnts` fit somehow.
 #[derive(Clone)]
 pub struct LayoutContext {
     /// The [`LayoutOptions`]
@@ -19,7 +19,6 @@ pub struct LayoutContext {
 }
 
 impl LayoutContext {
-
     /// Creates a new instance for the given `options` and `measurments`.
     ///
     /// # Parameters
@@ -28,7 +27,7 @@ impl LayoutContext {
     ///
     /// # Returns
     /// A new [`LayoutContext`]
-    #[must_use] 
+    #[must_use]
     pub fn new(options: LayoutOptions, measurements: Measurements) -> Self {
         Self {
             options,
@@ -65,7 +64,7 @@ impl LayoutContext {
     ///     Some(Rect::new(1, 0, Dimension::new(4, 5)))
     /// ));
     /// ```
-    #[must_use] 
+    #[must_use]
     pub fn new_with_intersection(
         options: &LayoutOptions,
         x: usize,

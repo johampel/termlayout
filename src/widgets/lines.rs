@@ -219,7 +219,9 @@ impl Layout for Lines {
             return Measurements::empty();
         }
         match mode {
-            MeasureMode::Min => self.measure(MeasureMode::pref_width(usize::MAX, WrapMode::Truncate(""))),
+            MeasureMode::Min => {
+                self.measure(MeasureMode::pref_width(usize::MAX, WrapMode::Truncate("")))
+            }
             MeasureMode::PrefWidth {
                 max_width,
                 wrap_mode,
@@ -407,23 +409,33 @@ mod tests {
         // Wrap case
         let lines = Lines::left("abc def\nghi\njklm");
         assert_eq!(
-            lines.measure(MeasureMode::pref_width(10, WrapMode::Wrap)).dim,
+            lines
+                .measure(MeasureMode::pref_width(10, WrapMode::Wrap))
+                .dim,
             Dimension::new(7, 3)
         );
         assert_eq!(
-            lines.measure(MeasureMode::pref_width(5, WrapMode::Wrap)).dim,
+            lines
+                .measure(MeasureMode::pref_width(5, WrapMode::Wrap))
+                .dim,
             Dimension::new(5, 4)
         );
         assert_eq!(
-            lines.measure(MeasureMode::pref_width(3, WrapMode::Wrap)).dim,
+            lines
+                .measure(MeasureMode::pref_width(3, WrapMode::Wrap))
+                .dim,
             Dimension::new(3, 6)
         );
         assert_eq!(
-            lines.measure(MeasureMode::pref_width(1, WrapMode::Wrap)).dim,
+            lines
+                .measure(MeasureMode::pref_width(1, WrapMode::Wrap))
+                .dim,
             Dimension::new(1, 14)
         );
         assert_eq!(
-            lines.measure(MeasureMode::pref_width(0, WrapMode::Wrap)).dim,
+            lines
+                .measure(MeasureMode::pref_width(0, WrapMode::Wrap))
+                .dim,
             Dimension::new(0, 0)
         );
 
@@ -465,23 +477,33 @@ mod tests {
         // Wrap case
         let lines = Lines::left("abc def\nghi\njklm");
         assert_eq!(
-            lines.measure(MeasureMode::fixed_width(10, WrapMode::Wrap)).dim,
+            lines
+                .measure(MeasureMode::fixed_width(10, WrapMode::Wrap))
+                .dim,
             Dimension::new(10, 3)
         );
         assert_eq!(
-            lines.measure(MeasureMode::fixed_width(5, WrapMode::Wrap)).dim,
+            lines
+                .measure(MeasureMode::fixed_width(5, WrapMode::Wrap))
+                .dim,
             Dimension::new(5, 4)
         );
         assert_eq!(
-            lines.measure(MeasureMode::fixed_width(3, WrapMode::Wrap)).dim,
+            lines
+                .measure(MeasureMode::fixed_width(3, WrapMode::Wrap))
+                .dim,
             Dimension::new(3, 6)
         );
         assert_eq!(
-            lines.measure(MeasureMode::fixed_width(1, WrapMode::Wrap)).dim,
+            lines
+                .measure(MeasureMode::fixed_width(1, WrapMode::Wrap))
+                .dim,
             Dimension::new(1, 14)
         );
         assert_eq!(
-            lines.measure(MeasureMode::fixed_width(0, WrapMode::Wrap)).dim,
+            lines
+                .measure(MeasureMode::fixed_width(0, WrapMode::Wrap))
+                .dim,
             Dimension::new(0, 0)
         );
 
@@ -524,7 +546,7 @@ mod tests {
         let lines = Lines::left("abc def\nghi\njklm");
         let measurements = lines.measure(MeasureMode::exact(
             Dimension::new(10, 5),
-            WrapMode::default()
+            WrapMode::default(),
         ));
         assert_eq!(measurements.dim, Dimension::new(10, 5));
         assert_eq!(measurements.specifics.is_none(), true);

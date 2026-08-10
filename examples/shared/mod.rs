@@ -68,7 +68,9 @@ impl Menu {
 
     /// Prints a styled error message in bold red to stdout.
     pub(crate) fn show_error<T>(message: T)
-    where T: AsRef<str> {
+    where
+        T: AsRef<str>,
+    {
         let mut error = TextBuilder::new();
         error.push_style(
             Style::default()
@@ -104,10 +106,7 @@ impl Menu {
         // Try to figure out the choice based on the first character
         if response.len() == 1 {
             let ch = response.chars().next().unwrap();
-            self.items
-                .iter()
-                .find(|a| a.item.key == ch)
-                .cloned()
+            self.items.iter().find(|a| a.item.key == ch).cloned()
         } else {
             None
         }

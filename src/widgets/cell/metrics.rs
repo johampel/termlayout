@@ -29,7 +29,7 @@ impl CellMetrics {
     ///
     /// # Returns
     /// A new [`CellMetrics`] instance with calculated dimensions and positions
-    #[must_use] 
+    #[must_use]
     pub fn new(
         options: &LayoutOptions,
         content_dim: Dimension,
@@ -89,7 +89,7 @@ impl CellMetrics {
     ///
     /// # Returns
     /// The [`LayoutOptions`] for the cell
-    #[must_use] 
+    #[must_use]
     pub fn cell_options(&self, fill_rows: bool, wrap_mode: WrapMode) -> LayoutOptions {
         LayoutOptions::new(self.cell_dim, fill_rows, wrap_mode, None)
     }
@@ -102,7 +102,7 @@ impl CellMetrics {
     ///
     /// # Returns
     /// The [`LayoutOptions`] for the content
-    #[must_use] 
+    #[must_use]
     pub fn content_options(&self, fill_rows: bool, wrap_mode: WrapMode) -> LayoutOptions {
         LayoutOptions::new(
             self.content_dim,

@@ -181,7 +181,7 @@ impl Row {
         });
     }
     /// Returns `true` if this row contains no cells.
-    #[must_use] 
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.cells.is_empty()
     }
@@ -198,7 +198,7 @@ impl Row {
     ///
     /// # Returns
     /// `Some(layout)` if the measurements contain a valid list of rows, `None` otherwise.
-    #[must_use] 
+    #[must_use]
     pub fn layout(context: LayoutContext) -> Option<BoxedFormattedLayout<'static>> {
         let specifics: Result<Vec<Row>, _> = context.measurements.specifics.try_into();
         match specifics {

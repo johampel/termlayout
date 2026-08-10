@@ -115,8 +115,12 @@ mod tests {
         // Arrange
         let layout: RcLayout = Lines::left("abcde\nfghij\nklmno\npqrst\nuvwxy").into();
         let content_options = LayoutOptions::default().with_dim(Dimension::new(5, 5));
-        let measurements = layout.measure(MeasureMode::exact(content_options.dim, content_options.wrap_mode));
-        let content = LayoutWithContext::of(layout, LayoutContext::new(content_options, measurements));
+        let measurements = layout.measure(MeasureMode::exact(
+            content_options.dim,
+            content_options.wrap_mode,
+        ));
+        let content =
+            LayoutWithContext::of(layout, LayoutContext::new(content_options, measurements));
 
         // No fill rows
         let options = LayoutOptions::default()

@@ -41,7 +41,6 @@ pub use crate::ext::base_layout_writer::StrLayoutResult;
 pub use crate::ext::base_layout_writer::VoidLayoutResult;
 
 pub use crate::ext::layout_with_context::LayoutWithContext;
-pub use crate::widgets::horizontal::row::Row;
 pub use crate::widgets::cell::metrics::CellMetrics;
 pub use crate::widgets::horizontal::metrics::HorizontalMetrics;
-
+pub use crate::widgets::horizontal::row::Row;
