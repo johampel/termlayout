@@ -4,6 +4,7 @@
   layout, we use the `measure` method instead which returns `Measurements`. Since the `Measurments` are not just the
   dimension of the layout but contain also cached sizing information about subordinated elements, the performance is 
   improved at least for complex widgets like table, vertical a.s.o.
+- Benchmarks added
 - Minor bugfixes
 
 # Version 0.1.0
