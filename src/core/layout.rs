@@ -1,4 +1,4 @@
-use crate::{Dimension, LayoutContext, LayoutOptions, MeasureMode, Measurements, WrapMode};
+use crate::{LayoutContext, LayoutOptions, MeasureMode, Measurements, WrapMode};
 use std::any::Any;
 use std::fmt::{Display, Error, Formatter, Write};
 use std::rc::Rc;
@@ -67,21 +67,6 @@ use std::rc::Rc;
 ///     ));
 /// ```
 pub trait Layout {
-
-    #[deprecated(since = "0.1.1", note = "Use `measure()` instead")]
-    fn pref_dim(&self, max_width: usize, wrap_mode: WrapMode) -> Dimension {
-        self.measure(MeasureMode::pref_width(max_width, wrap_mode)).dim
-    }
-
-    #[deprecated(since = "0.1.1", note = "Use `measure()` instead")]
-    fn pref_dim_fixed_width(&self, width: usize, wrap_mode: WrapMode) -> Dimension {
-        self.measure(MeasureMode::FixedWidth {width, wrap_mode}).dim
-    }
-
-    #[deprecated(since = "0.1.1", note = "Use `measure()` instead")]
-    fn min_dim(&self) -> Dimension {
-        self.measure(MeasureMode::Min).dim
-    }
 
     /// Computes the [`Measurements`] of this instance based on the given `mode`.
     /// The [`Measurements`] contains at least the overall dimension of the `Layout`, but it might
@@ -439,7 +424,7 @@ pub type SizedLayoutResult = Result<usize, Error>;
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::Rect;
+    use crate::{Dimension, Rect};
 
     struct MockLayoutWriter<'a> {
         options: &'a LayoutOptions,

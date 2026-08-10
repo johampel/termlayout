@@ -105,18 +105,18 @@ impl Write for NullWrite {
 
 #[cfg(test)]
 mod tests {
-    use crate::ext::{FormattedLayout, LayoutWithOptions, LayoutWriter};
+    use crate::ext::{FormattedLayout, LayoutWithContext, LayoutWriter};
     use crate::widgets::Lines;
     use crate::widgets::cell::formatted::CellWriter;
-    use crate::{Dimension, LayoutOptions};
+    use crate::{Dimension, LayoutContext, LayoutOptions, MeasureMode, RcLayout};
 
     #[test]
     fn cell_writer() {
         // Arrange
-        let content = LayoutWithOptions::of(
-            Lines::left("abcde\nfghij\nklmno\npqrst\nuvwxy").into(),
-            LayoutOptions::default().with_dim(Dimension::new(5, 5)),
-        );
+        let layout: RcLayout = Lines::left("abcde\nfghij\nklmno\npqrst\nuvwxy").into();
+        let content_options = LayoutOptions::default().with_dim(Dimension::new(5, 5));
+        let measurements = layout.measure(MeasureMode::exact(content_options.dim, content_options.wrap_mode));
+        let content = LayoutWithContext::of(layout, LayoutContext::new(content_options, measurements));
 
         // No fill rows
         let options = LayoutOptions::default()

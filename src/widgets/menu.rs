@@ -1,13 +1,13 @@
 use crate::ext::{
     BaseLayoutWriter, BoxedLayoutWriter, DisplayStr, FormattedLayout, LayoutWithContext,
-    LayoutWithOptions, LayoutWriter, SizedLayoutResult,
+    LayoutWriter, SizedLayoutResult,
 };
 use crate::widgets::lines::LinesTrimming;
 use crate::widgets::vertical::FormattedVertical;
 use crate::widgets::{Lines, LinesAlignment};
 use crate::{
     BoxedFormattedLayout, Dimension, Layout, LayoutContext, LayoutOptions, MeasureMode,
-    MeasurementSpecifics, Measurements, RcLayout, Rect, box_formatted_layout, rc_layout,
+    MeasurementSpecifics, Measurements, RcLayout, box_formatted_layout, rc_layout,
 };
 use std::any::Any;
 use std::cmp::max;
@@ -493,7 +493,7 @@ impl Default for MenuItemMarker {
 mod tests {
     use super::*;
     use crate::widgets::Paragraph;
-    use crate::WrapMode;
+    use crate::{Rect, WrapMode};
 
     #[test]
     fn menu_item_marker_from_spec_valid() {
