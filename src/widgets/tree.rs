@@ -127,32 +127,13 @@ impl Tree {
             }
             _ => None,
         }
-        // let prefix = path.prefixes(&self.decoration);
-        // let available_width = max(1, options.dim.width.saturating_sub(prefix.0.display_len()));
-        // let prefix_len = options.dim.width.saturating_sub(available_width);
-        // let pref_dim = path.node.item.pref_dim(available_width, options.wrap_mode);
-        // let item_opts = options.intersect(Rect::new(prefix_len, offset, pref_dim), false);
-        // let item = LayoutWithOptions::of(path.node.item.clone(), item_opts).into();
-        // let node_opts = options.intersect(
-        //     Rect::new(
-        //         0,
-        //         offset,
-        //         Dimension::new(options.dim.width, pref_dim.height),
-        //     ),
-        //     false,
-        // );
-        // let prefix = (
-        //     prefix.0.display_slice(0..prefix_len).to_string(),
-        //     prefix.1.display_slice(0..prefix_len).to_string(),
-        // );
-        // FormattedTreeNode::new(prefix, item, node_opts).into()
     }
 }
 
 impl Layout for Tree {
     fn measure(&self, mode: MeasureMode) -> Measurements {
         if mode.is_empty() {
-            return Measurements::empty();
+            return Measurements::empty().with_specifics(MeasurementSpecifics::Children(vec![]));
         }
         let prefix_len = self.decoration.prefix_len();
         let max_width = mode.coerce_width(usize::MAX);
@@ -197,22 +178,6 @@ impl Layout for Tree {
 
         Measurements::new(dim, MeasurementSpecifics::Children(children))
     }
-
-    // fn layout_strict(&'_ self, options: LayoutOptions) -> BoxedFormattedLayout<'_> {
-    //     let mut rows = vec![];
-    //     let mut offset = 0;
-    //     self.root.traverse(self.show_root, |path| {
-    //         let node = self.format_node(path, &options, offset);
-    //         offset += node.options().dim.height;
-    //         rows.push(node);
-    //     });
-    //
-    //     if rows.len() == 1 {
-    //         return rows.remove(0);
-    //     }
-    //
-    //     FormattedVertical::new(rows, options.with_normalized_horizontal_clip()).into()
-    // }
 
     fn layout_with_context(&'_ self, context: LayoutContext) -> BoxedFormattedLayout<'_> {
         match context.measurements.specifics {

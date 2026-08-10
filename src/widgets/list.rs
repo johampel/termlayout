@@ -311,25 +311,29 @@ impl Layout for List {
         match context.measurements.specifics {
             MeasurementSpecifics::Children(item_measurements) => {
                 let mut y = 0;
-                let children = self
-                    .items
-                    .iter()
-                    .zip(item_measurements.iter())
-                    .enumerate()
-                    .map(|(index, (item, measurements))| {
-                        let ctxt = LayoutContext::new_with_intersection(
-                            &context.options,
-                            0,
-                            y,
-                            measurements.clone(),
-                        );
-                        y += ctxt.options.dim.height;
-                        match self.layout_item(index, item.clone(), ctxt) {
-                            Some(layout) => layout,
-                            _ => return self.layout_strict(context.options),
+                let mut children = Vec::with_capacity(item_measurements.len());
+                let mut ok = true;
+                for (index, (item, measurements)) in
+                    self.items.iter().zip(item_measurements.iter()).enumerate()
+                {
+                    let ctxt = LayoutContext::new_with_intersection(
+                        &context.options,
+                        0,
+                        y,
+                        measurements.clone(),
+                    );
+                    y += ctxt.options.dim.height;
+                    match self.layout_item(index, item.clone(), ctxt) {
+                        Some(layout) => children.push(layout),
+                        _ => {
+                            ok = false;
+                            break;
                         }
-                    })
-                    .collect();
+                    }
+                }
+                if !ok {
+                    return self.layout_strict(context.options);
+                }
                 FormattedVertical::new(children, context.options).into()
             }
             _ => self.layout_strict(context.options),

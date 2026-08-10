@@ -141,8 +141,9 @@ pub enum CellWidth {
     Fixed(usize),
 
     /// The width of the cell content is the same as the preferred width of the content,
-    /// as returned by [`pref_dim()`](Layout::pref_dim) for the given `value`. Note that this is a
-    /// subtile way different from `Fixed`, since the actual width might be smaller than `value`.
+    /// as returned by [`measure()`](Layout::measure) with [mode pref-width](MeasureMode::PrefWidth)
+    /// for the given `value`. Note that this is a subtile way different from `Fixed`, since the
+    /// actual width might be smaller than `value`.
     Preferred(usize),
 
     /// The width of the cell content is proportional to the width of the

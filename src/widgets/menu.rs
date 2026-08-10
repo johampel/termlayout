@@ -1,11 +1,14 @@
 use crate::ext::{
-    BaseLayoutWriter, BoxedLayoutWriter, DisplayStr, FormattedLayout, LayoutWithOptions,
-    LayoutWriter, SizedLayoutResult,
+    BaseLayoutWriter, BoxedLayoutWriter, DisplayStr, FormattedLayout, LayoutWithContext,
+    LayoutWithOptions, LayoutWriter, SizedLayoutResult,
 };
 use crate::widgets::lines::LinesTrimming;
 use crate::widgets::vertical::FormattedVertical;
 use crate::widgets::{Lines, LinesAlignment};
-use crate::{box_formatted_layout, rc_layout, BoxedFormattedLayout, Dimension, Layout, LayoutOptions, MeasureMode, RcLayout, Rect, WrapMode, Measurements, LayoutContext};
+use crate::{
+    BoxedFormattedLayout, Dimension, Layout, LayoutContext, LayoutOptions, MeasureMode,
+    MeasurementSpecifics, Measurements, RcLayout, Rect, box_formatted_layout, rc_layout,
+};
 use std::any::Any;
 use std::cmp::max;
 use std::fmt::Write;
@@ -118,6 +121,48 @@ impl Menu {
         .into()
     }
 
+    fn measure_item(item: &MenuItem, marker_width: usize, mode: MeasureMode) -> Measurements {
+        let content_measurements = item.text.measure(mode);
+        let marker_measurements: Measurements =
+            Dimension::new(marker_width, content_measurements.dim.height).into();
+        Measurements::new(
+            content_measurements
+                .dim
+                .horizontal_union(marker_measurements.dim),
+            MeasurementSpecifics::Children(vec![marker_measurements, content_measurements]),
+        )
+    }
+
+    fn layout_item<'a>(
+        &self,
+        item: &'a MenuItem,
+        context: LayoutContext,
+    ) -> Option<BoxedFormattedLayout<'a>> {
+        match context.measurements.specifics {
+            MeasurementSpecifics::Children(m) if m.len() == 2 => {
+                let mut marker_context =
+                    LayoutContext::new_with_intersection(&context.options, 0, 0, m[0].clone());
+                marker_context.options.fill_rows = true;
+                let item_context = LayoutContext::new_with_intersection(
+                    &context.options,
+                    marker_context.options.dim.width,
+                    0,
+                    m[1].clone(),
+                );
+                let marker = self.create_marker(item);
+                Some(
+                    FormattedMenuItem::new(
+                        context.options.with_normalized_horizontal_clip(),
+                        LayoutWithContext::of(marker, marker_context).into(),
+                        item.text.layout_strict(item_context.options),
+                    )
+                    .into(),
+                )
+            }
+            _ => None,
+        }
+    }
+
     fn calculate_widths(&self, max_width: usize) -> (usize, usize) {
         if max_width > 0 {
             let marker_width = self.marker.width();
@@ -130,61 +175,73 @@ impl Menu {
 }
 
 impl Layout for Menu {
-    fn pref_dim(&self, max_width: usize, wrap_mode: WrapMode) -> Dimension {
-        let (marker_width, item_width) = self.calculate_widths(max_width);
-        let mut dim = self.items.iter().fold(Dimension::empty(), |acc, item| {
-            acc.vertical_union(item.text.pref_dim(item_width, wrap_mode))
-        });
-        dim.width += marker_width;
-        dim
-    }
-
-    fn min_dim(&self) -> Dimension {
-        let mut dim = self.items.iter().fold(Dimension::empty(), |acc, item| {
-            acc.vertical_union(item.text.min_dim())
-        });
-        dim.width += self.marker.width();
-        dim
-    }
-
     fn measure(&self, mode: MeasureMode) -> Measurements {
-        todo!()
-    }
+        let mut height = mode.height();
+        let max_width = mode.coerce_width(usize::MAX);
+        let (marker_width, item_width) = self.calculate_widths(max_width);
+        let mut children = Vec::with_capacity(self.items.len());
+        let mut dim = Dimension::empty();
 
-    fn layout_strict(&'_ self, options: LayoutOptions) -> BoxedFormattedLayout<'_> {
-        let (marker_width, item_width) = self.calculate_widths(options.dim.width);
-        let mut row = 0;
-        let content = self
-            .items
-            .iter()
-            .map(|item| {
-                let item_dim = item.text.pref_dim(item_width, options.wrap_mode);
-                let item_options = options.intersect(Rect::new(marker_width, row, item_dim), false);
-                let line_options = options
-                    .intersect(
-                        Rect::new(0, row, Dimension::new(options.dim.width, item_dim.height)),
-                        true,
-                    )
-                    .with_normalized_horizontal_clip();
-                let marker_options = options.intersect(
-                    Rect::new(0, row, Dimension::new(marker_width, item_dim.height)),
-                    true,
-                );
-                let marker = self.create_marker(item);
-                row += item_dim.height;
-                FormattedMenuItem::new(
-                    line_options,
-                    LayoutWithOptions::of(marker, marker_options).into(),
-                    item.text.layout_strict(item_options),
-                )
-                .into()
-            })
-            .collect();
-        FormattedVertical::new(content, options.with_normalized_horizontal_clip()).into()
+        for (index, item) in self.items.iter().enumerate() {
+            let item_mode = match mode {
+                MeasureMode::Min => MeasureMode::Min,
+                MeasureMode::PrefWidth { wrap_mode, .. } => {
+                    MeasureMode::pref_width(item_width, wrap_mode)
+                }
+                MeasureMode::FixedWidth { wrap_mode, .. } => {
+                    MeasureMode::fixed_width(item_width, wrap_mode)
+                }
+                MeasureMode::Exact { wrap_mode, .. } => {
+                    MeasureMode::fixed_width(item_width, wrap_mode)
+                }
+            };
+            let mut item_measurements = Self::measure_item(item, marker_width, item_mode);
+            if let Some(h) = height {
+                if h < item_measurements.dim.height || index == self.items.len() - 1 {
+                    item_measurements.dim.height = h;
+                }
+                height = Some(h.saturating_sub(item_measurements.dim.height))
+            }
+            dim = dim.vertical_union(item_measurements.dim);
+            children.push(item_measurements);
+
+            if height == Some(0) {
+                break;
+            }
+        }
+
+        Measurements::new(dim, MeasurementSpecifics::Children(children))
     }
 
     fn layout_with_context(&'_ self, context: LayoutContext) -> BoxedFormattedLayout<'_> {
-        todo!()
+        match context.measurements.specifics {
+            MeasurementSpecifics::Children(item_measurements) => {
+                let mut y = 0;
+                let mut children = Vec::with_capacity(item_measurements.len());
+                let mut ok = true;
+                for (item, measurements) in self.items.iter().zip(item_measurements.iter()) {
+                    let ctxt = LayoutContext::new_with_intersection(
+                        &context.options,
+                        0,
+                        y,
+                        measurements.clone(),
+                    );
+                    y += ctxt.options.dim.height;
+                    match self.layout_item(item, ctxt) {
+                        Some(layout) => children.push(layout),
+                        _ => {
+                            ok = false;
+                            break;
+                        }
+                    }
+                }
+                if !ok {
+                    return self.layout_strict(context.options);
+                }
+                FormattedVertical::new(children, context.options).into()
+            }
+            _ => self.layout_strict(context.options),
+        }
     }
 
     fn as_any(&self) -> &dyn Any {
@@ -436,6 +493,7 @@ impl Default for MenuItemMarker {
 mod tests {
     use super::*;
     use crate::widgets::Paragraph;
+    use crate::WrapMode;
 
     #[test]
     fn menu_item_marker_from_spec_valid() {
@@ -480,7 +538,7 @@ mod tests {
     }
 
     #[test]
-    fn menu_min_dim() {
+    fn menu_measure_min() {
         let menu = Menu::new(vec![
             MenuItem::new('1', Paragraph::left("First option")),
             MenuItem::new('2', Paragraph::left("Second option")),
@@ -489,19 +547,27 @@ mod tests {
 
         // Paragraphs wrap based on longest word: "Second" = 6 chars + marker 4 chars = 10 width
         // Each paragraph wraps to 2 lines, so 3 items * 2 lines = 6 height
-        assert_eq!(menu.min_dim(), Dimension::new(10, 6));
+        assert_eq!(menu.measure(MeasureMode::min()).dim, Dimension::new(10, 6));
     }
 
     #[test]
-    fn menu_pref_dim() {
+    fn menu_measure_pref_width() {
         let menu = Menu::new(vec![
             MenuItem::new('1', Paragraph::left("First option")),
             MenuItem::new('2', Paragraph::left("Second option")),
             MenuItem::new('3', Paragraph::left("Third option")),
         ]);
 
-        assert_eq!(menu.pref_dim(20, WrapMode::Wrap), Dimension::new(17, 3));
-        assert_eq!(menu.pref_dim(10, WrapMode::Wrap), Dimension::new(10, 6));
+        assert_eq!(
+            menu.measure(MeasureMode::pref_width(20, WrapMode::Wrap))
+                .dim,
+            Dimension::new(17, 3)
+        );
+        assert_eq!(
+            menu.measure(MeasureMode::pref_width(10, WrapMode::Wrap))
+                .dim,
+            Dimension::new(10, 6)
+        );
     }
 
     #[test]
@@ -622,7 +688,7 @@ mod tests {
             ],
         );
 
-        assert_eq!(menu.min_dim(), Dimension::new(9, 2));
+        assert_eq!(menu.measure(MeasureMode::Min).dim, Dimension::new(9, 2));
 
         let options = LayoutOptions::new(Dimension::new(15, 3), false, WrapMode::Wrap, None);
         let layout = menu.layout_strict(options);
