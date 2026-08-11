@@ -1,8 +1,11 @@
-use crate::ext::{DisplayStr, LayoutWithOptions};
+use crate::ext::{DisplayStr, LayoutWithContext};
 use crate::widgets::TreeDecoration;
 use crate::widgets::tree::formatted::FormattedTreeNode;
 use crate::widgets::vertical::FormattedVertical;
-use crate::{BoxedFormattedLayout, Dimension, Layout, LayoutOptions, RcLayout, Rect, WrapMode};
+use crate::{
+    BoxedFormattedLayout, Dimension, Layout, LayoutContext, MeasureMode, MeasurementSpecifics,
+    Measurements, RcLayout,
+};
 use std::any::Any;
 use std::cmp::max;
 
@@ -92,75 +95,120 @@ impl Tree {
         }
     }
 
-    fn format_node(
+    fn layout_node(
         &self,
         path: &TreePath,
-        options: &LayoutOptions,
-        offset: usize,
-    ) -> BoxedFormattedLayout<'static> {
-        let prefix = path.prefixes(&self.decoration);
-        let available_width = max(1, options.dim.width.saturating_sub(prefix.0.display_len()));
-        let prefix_len = options.dim.width.saturating_sub(available_width);
-        let pref_dim = path.node.item.pref_dim(available_width, options.wrap_mode);
-        let item_opts = options.intersect(Rect::new(prefix_len, offset, pref_dim), false);
-        let item = LayoutWithOptions::of(path.node.item.clone(), item_opts).into();
-        let node_opts = options.intersect(
-            Rect::new(
-                0,
-                offset,
-                Dimension::new(options.dim.width, pref_dim.height),
-            ),
-            false,
-        );
-        let prefix = (
-            prefix.0.display_slice(0..prefix_len).to_string(),
-            prefix.1.display_slice(0..prefix_len).to_string(),
-        );
-        FormattedTreeNode::new(prefix, item, node_opts).into()
+        context: LayoutContext,
+    ) -> Option<BoxedFormattedLayout<'static>> {
+        match context.measurements.specifics {
+            MeasurementSpecifics::Child(item_measurements) => {
+                // Compute prefix
+                let prefix = path.prefixes(&self.decoration);
+                let prefix_len = context
+                    .measurements
+                    .dim
+                    .width
+                    .saturating_sub(item_measurements.dim.width);
+                let prefix = (
+                    prefix.0.display_slice(0..prefix_len).to_string(),
+                    prefix.1.display_slice(0..prefix_len).to_string(),
+                );
+
+                // Compute item formatted layout
+                let item_context = LayoutContext::new_with_intersection(
+                    &context.options,
+                    prefix_len,
+                    0,
+                    item_measurements.as_ref().clone(),
+                );
+                let item = LayoutWithContext::of(path.node.item.clone(), item_context).into();
+
+                Some(FormattedTreeNode::new(prefix, item, context.options).into())
+            }
+            _ => None,
+        }
     }
 }
 
 impl Layout for Tree {
-    fn pref_dim(&self, max_width: usize, wrap_mode: WrapMode) -> Dimension {
-        if max_width == 0 {
-            return Dimension::empty();
+    fn measure(&self, mode: MeasureMode) -> Measurements {
+        if mode.is_empty() {
+            return Measurements::empty().with_specifics(MeasurementSpecifics::Children(vec![]));
         }
-        let mut dim = Dimension::empty();
         let prefix_len = self.decoration.prefix_len();
+        let max_width = mode.coerce_width(usize::MAX);
+        let mut height = mode.height();
+        let mut dim = Dimension::empty();
+        let mut children = vec![];
         self.root.traverse(self.show_root, |path| {
-            let available_width = max(1, max_width.saturating_sub(prefix_len * path.depth));
-            let mut node_dim = path.node.item.pref_dim(available_width, wrap_mode);
-            node_dim.width += prefix_len * path.depth;
-            dim = dim.vertical_union(node_dim);
+            if height != Some(0) {
+                let item_width = max(1, max_width.saturating_sub(prefix_len * path.depth));
+                let prefix_width = max_width - item_width;
+                let item_mode = match mode {
+                    MeasureMode::Min => MeasureMode::Min,
+                    MeasureMode::PrefWidth { wrap_mode, .. } => {
+                        MeasureMode::pref_width(item_width, wrap_mode)
+                    }
+                    MeasureMode::FixedWidth { wrap_mode, .. }
+                    | MeasureMode::Exact { wrap_mode, .. } => {
+                        MeasureMode::fixed_width(item_width, wrap_mode)
+                    }
+                };
+                let mut measurements = path.node.item.measure(item_mode);
+                if let Some(h) = height {
+                    if path.last_of_all() || measurements.dim.height > h {
+                        measurements.dim.height = h;
+                    }
+                    height = Some(h.saturating_sub(measurements.dim.height));
+                }
+                let node_dim = Dimension::new(
+                    measurements.dim.width + prefix_width,
+                    measurements.dim.height,
+                );
+                dim = dim.vertical_union(node_dim);
+                children.push(Measurements::new(
+                    node_dim,
+                    MeasurementSpecifics::Child(Box::new(measurements)),
+                ));
+            }
+            true
         });
-        dim
+
+        Measurements::new(dim, MeasurementSpecifics::Children(children))
     }
 
-    fn min_dim(&self) -> Dimension {
-        let mut dim = Dimension::empty();
-        let prefix_len = self.decoration.prefix_len();
-        self.root.traverse(self.show_root, |path| {
-            let mut node_dim = path.node.item.min_dim();
-            node_dim.width += prefix_len * path.depth;
-            dim = dim.vertical_union(node_dim);
-        });
-        dim
-    }
-
-    fn layout_strict(&'_ self, options: LayoutOptions) -> BoxedFormattedLayout<'_> {
-        let mut rows = vec![];
-        let mut offset = 0;
-        self.root.traverse(self.show_root, |path| {
-            let node = self.format_node(path, &options, offset);
-            offset += node.options().dim.height;
-            rows.push(node);
-        });
-
-        if rows.len() == 1 {
-            return rows.remove(0);
+    fn layout_with_context(&'_ self, context: LayoutContext) -> BoxedFormattedLayout<'_> {
+        match context.measurements.specifics {
+            MeasurementSpecifics::Children(item_measurements) => {
+                let mut y = 0;
+                let mut index = 0;
+                let mut children = Vec::new();
+                let ok = self.root.traverse(self.show_root, |path| {
+                    if index >= item_measurements.len() {
+                        return true;
+                    }
+                    let measurements = item_measurements[index].clone();
+                    let ctxt = LayoutContext::new_with_intersection(
+                        &context.options,
+                        0,
+                        y,
+                        measurements.clone(),
+                    );
+                    index += 1;
+                    y += measurements.dim.height;
+                    match self.layout_node(path, ctxt) {
+                        Some(layout) => children.push(layout),
+                        _ => return false,
+                    }
+                    true
+                });
+                if !ok {
+                    return self.layout_strict(context.options);
+                }
+                FormattedVertical::new(children, context.options).into()
+            }
+            _ => self.layout_strict(context.options),
         }
-
-        FormattedVertical::new(rows, options.with_normalized_horizontal_clip()).into()
     }
 
     fn as_any(&self) -> &dyn Any {
@@ -235,16 +283,20 @@ impl TreeNode {
     ///   node.
     /// - `callback`: A closure or function that takes a reference to a [`TreePath`] and performs
     ///   an operation on it. This closure must implement the `FnMut` trait, allowing it to have
-    ///   mutable state.
-    pub fn traverse<T>(&self, include_self: bool, mut callback: T)
+    ///   mutable state. It should return `true`, if traversing can go on, or `false`, if it should
+    ///   be stopped.
+    ///
+    /// # Returns
+    /// `true`, if the traversal was completed, or `false`, if it was stopped by the callback.
+    pub fn traverse<T>(&self, include_self: bool, mut callback: T) -> bool
     where
-        T: FnMut(&TreePath),
+        T: FnMut(&TreePath) -> bool,
     {
         let path = TreePath::new(self, true, None);
-        if include_self {
-            callback(&path);
+        if include_self && !callback(&path) {
+            return false;
         }
-        path.traverse_children(&mut callback);
+        path.traverse_children(&mut callback)
     }
 }
 
@@ -285,16 +337,18 @@ impl<'a> TreePath<'a> {
         }
     }
 
-    fn traverse_children<T>(&self, callback: &mut T)
+    fn traverse_children<T>(&self, callback: &mut T) -> bool
     where
-        T: FnMut(&TreePath),
+        T: FnMut(&TreePath) -> bool,
     {
         let len = self.node.children.len();
         for (index, child) in self.node.children.iter().enumerate() {
             let child = TreePath::new(child, index + 1 == len, Some(self));
-            callback(&child);
-            child.traverse_children(callback);
+            if !callback(&child) || !child.traverse_children(callback) {
+                return false;
+            }
         }
+        true
     }
 
     fn prefixes(&self, decoration: &TreeDecoration) -> (String, String) {
@@ -306,12 +360,19 @@ impl<'a> TreePath<'a> {
             (String::new(), String::new())
         }
     }
+
+    fn last_of_all(&self) -> bool {
+        self.last_child
+            && self.node.children.is_empty()
+            && self.parent.is_none_or(TreePath::last_of_all)
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::widgets::Lines;
+    use crate::{LayoutOptions, Rect, WrapMode};
 
     fn sample_nodes() -> TreeNode {
         TreeNode::new(
@@ -345,6 +406,35 @@ mod tests {
                 ),
             ],
         )
+    }
+
+    #[test]
+    fn tree_measure_min() {
+        let tree = Tree::new(TreeDecoration::lines(1), sample_nodes(), true);
+
+        assert_eq!(tree.measure(MeasureMode::Min).dim, Dimension::new(19, 22));
+    }
+
+    #[test]
+    fn tree_measure_pref_width() {
+        let tree = Tree::new(TreeDecoration::lines(1), sample_nodes(), true);
+
+        assert_eq!(
+            tree.measure(MeasureMode::pref_width(20, WrapMode::Wrap))
+                .dim,
+            Dimension::new(19, 22)
+        );
+
+        assert_eq!(
+            tree.measure(MeasureMode::pref_width(10, WrapMode::Wrap))
+                .dim,
+            Dimension::new(10, 90)
+        );
+        assert_eq!(
+            tree.measure(MeasureMode::pref_width(10, WrapMode::default_truncate()))
+                .dim,
+            Dimension::new(10, 22)
+        );
     }
 
     #[test]

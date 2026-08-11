@@ -1,204 +1,261 @@
 use crate::ext::{
-    BaseLayoutWriter, BoxedLayoutWriter, DisplayStr, FormattedLayout, LayoutWithOptions,
-    LayoutWriter, SizedLayoutResult,
+    BaseLayoutWriter, BoxedLayoutWriter, FormattedLayout, LayoutWithContext, LayoutWriter,
+    SizedLayoutResult,
 };
-use crate::widgets::{Cell, CellAnchor, CellDimension, Filler};
-use crate::{BoxedFormattedLayout, Dimension, LayoutOptions, Rect, WrapMode};
+use crate::widgets::vertical::FormattedVertical;
+use crate::widgets::{Cell, CellAnchor, CellDimension};
+use crate::{
+    BoxedFormattedLayout, Dimension, LayoutContext, LayoutOptions, MeasurementSpecifics,
+    Measurements, Rect,
+};
 use std::cmp::max;
+use std::collections::VecDeque;
 use std::fmt::Write;
 
-/// A `Row` is a helper struct used for horizontal layouting.
-/// The basic idea is to arrange [`Cell`]s into `Rows`. A single `Row` contains the (portions) of
-/// `Cells` that fit into a single horizontal row. Typically, instances of this type are created
-/// via the [`Row::from_cells`] function which returns a vector of `Row`s (the vector contains only
-/// one element in case all cells fit into a single row).
+/// Represents a horizontally arranged set of [`Cell`]s and its corresponding [`Measurements`].
+///
+/// A `Row` is a helper struct for the [`Horizontal`](super::Horizontal) and
+/// [`Table`](crate::widgets::Table) widgets. It does not implement the `Layout` trait and is not
+/// aware of line wrapping or truncation. It is primarily used to collect `Cells` that fit into
+/// one display row.
+///
+/// Custom widget implementations might reuse this type.
+#[derive(Clone)]
 pub struct Row {
-    /// The list of [`Cell`]s that belong to the row.
-    pub(crate) cells: Vec<Cell>,
-
-    /// The total [`Dimension`] of all cells in the row
-    pub(crate) dim: Dimension,
+    /// The overall [`Dimension`]
+    pub dim: Dimension,
+    /// The [`Cell`] - [`Measurements`] - pairs that make up the row.
+    pub cells: VecDeque<(Cell, Measurements)>,
 }
 
 impl Row {
-    /// Creates a group of [`Row`]s based on the provided [`Cell`]s, maximum width, and wrap mode.
-    ///
-    /// # Parameters
-    /// - `cells`: The list of `Cells`
-    /// - `max_width`: The maximum width of a single row
-    /// - `wrap_mode`: The wrap mode to use for breaking cells into multiple rows
+    #[must_use]
+    fn new(dim: Dimension, cells: VecDeque<(Cell, Measurements)>) -> Self {
+        Self { dim, cells }
+    }
+
+    /// Creates an initially empty instance.
     ///
     /// # Returns
-    /// A vector of [`Row`]s representing the arranged cells
+    /// The new instance
     ///
     /// # Example
     /// ```rust
-    /// use termlayout::widgets::{Cell, Lines, Row};
-    /// use termlayout::{Dimension, WrapMode};
     ///
-    /// let cells = vec![
-    ///     Cell::of(Lines::left("abcdefghij\nklmnopqrst"))
-    ///         .with_dim(Dimension::new(10, 2)),
-    ///     Cell::of(Lines::left("01234\n56789"))
-    ///         .with_dim(Dimension::new(5, 2)),
-    ///     Cell::of(Lines::left("ABCDEFGHIJ\nKLMNOPQRST"))
-    ///         .with_dim(Dimension::new(10, 2)),
-    /// ];
+    /// use termlayout::ext::Row;
     ///
-    /// let rows = Row::from_cells(cells.clone(), 25, WrapMode::Wrap); // All cells fit in one row
-    /// assert_eq!(rows.len(), 1);
+    /// let row = Row::empty();
     ///
-    /// let rows = Row::from_cells(cells.clone(), 10, WrapMode::Wrap); // The cells are split over three rows
-    /// assert_eq!(rows.len(), 3);
+    /// assert_eq!(row.is_empty(), true);
+    /// assert_eq!(row.cells.is_empty(), true);
+    /// assert_eq!(row.dim.is_empty(), true);
     /// ```
-    pub fn from_cells<T>(cells: T, max_width: usize, wrap_mode: WrapMode) -> Vec<Self>
-    where
-        T: Into<Vec<Cell>>,
-    {
-        if max_width == 0 {
-            return vec![];
-        }
-        let cells = cells.into();
-
-        // Check, whether all cells fit in one row
-        let total_dim = cells
-            .iter()
-            .map(Cell::visible_content)
-            .fold(Dimension::empty(), |acc, rect| {
-                acc.horizontal_union(rect.dim)
-            });
-        if total_dim.width <= max_width {
-            return vec![Row::new(cells, total_dim)];
-        }
-
-        // Apply wrap mode
-        match wrap_mode {
-            WrapMode::Wrap => Self::from_cells_with_wrap(cells, max_width),
-            WrapMode::Truncate(indicator) => {
-                Self::from_cells_with_truncate(cells, max_width, indicator)
-            }
-        }
+    #[must_use]
+    pub fn empty() -> Self {
+        Self::new(Dimension::new(0, 0), VecDeque::new())
     }
 
-    fn from_cells_with_wrap(mut cells: Vec<Cell>, max_width: usize) -> Vec<Self> {
-        let mut rows = Vec::new();
-        let mut index = 0;
-
-        while index < cells.len() {
-            let (ofs, mut dim) = Self::collect_complete_cells_for_row(&cells[index..], max_width);
-            let mut row = cells[index..index + ofs].to_vec();
-            index += ofs;
-            if index < cells.len() && dim.width < max_width {
-                let (cell, rest) = cells[index].split_horizontal(max_width - dim.width);
-                dim = dim.horizontal_union(cell.visible_content().dim);
-                row.push(cell);
-                if !rest.visible_content().is_empty() {
-                    cells[index] = rest;
-                }
-            }
-            rows.push(Row::new(row, dim));
-        }
-        rows
-    }
-
-    fn from_cells_with_truncate(
-        mut cells: Vec<Cell>,
-        max_width: usize,
-        indicator: &str,
-    ) -> Vec<Self> {
-        // compute the limits
-        let indicator_len = indicator.display_len();
-        let available_width = max(1, max_width.saturating_sub(indicator_len));
-        let indicator = indicator.display_slice(0..max_width - available_width);
-
-        // Compute the cells
-        let (mut index, mut dim) = Self::collect_complete_cells_for_row(&cells, available_width);
-        if index < cells.len() && dim.width < available_width {
-            cells[index].truncate_horizontal(available_width - dim.width);
-            dim = dim.horizontal_union(cells[index].visible_content().dim);
-            index += 1;
-        }
-        cells.truncate(index);
-
-        // Add the indicator
-        let filler = Cell::of(Filler::vertical(indicator))
-            .with_anchor(CellAnchor::Fill)
-            .with_dim(Dimension::new(indicator.display_len(), 1));
-        dim = dim.horizontal_union(filler.visible_content().dim);
-        cells.push(filler);
-
-        vec![Row::new(cells, dim)]
-    }
-
-    fn collect_complete_cells_for_row(cells: &[Cell], max_width: usize) -> (usize, Dimension) {
-        let mut dim = Dimension::empty();
-        for (index, cell) in cells.iter().enumerate() {
-            let cell_dim = cell.visible_content().dim;
-            if dim.width + cell_dim.width > max_width {
-                return (index, dim);
-            }
-            dim = dim.horizontal_union(cell_dim);
-        }
-        (cells.len(), dim)
-    }
-
-    fn new(mut cells: Vec<Cell>, dim: Dimension) -> Self {
-        cells
-            .iter_mut()
-            .filter(|cell| cell.anchor == CellAnchor::Fill)
-            .for_each(|cell| {
-                let dims = cell.dim.dims().unwrap();
-                cell.dim = CellDimension::Fixed {
-                    cell: Dimension::new(dims.0.width, dim.height),
-                    content: Dimension::new(dims.0.width, dim.height),
-                };
-            });
-        Self { cells, dim }
-    }
-
-    /// Creates a [`FormattedLayout`] for the row with the given options.
+    /// Adds a [`Cell`]-[`Measurements`] pair to the end of the instance.
+    /// The method implicitly updates the `dim` field.
     ///
     /// # Parameters
-    /// - `options`: Layout options for the row
+    /// - `cell`: The [`Cell`] to append
+    /// - `measurements`: The corresponding [`Measurements`]
+    ///
+    /// # Èxample
+    /// ```rust
+    ///
+    /// use termlayout::{Dimension, MeasurementSpecifics, Measurements};
+    /// use termlayout::ext::Row;
+    /// use termlayout::widgets::{Cell, Lines};
+    ///
+    /// let cell1 = Cell::of(Lines::left("first\nline"));
+    /// let measurements1 = Measurements::new(Dimension::new(5, 2), MeasurementSpecifics::None);
+    /// let cell2 = Cell::of(Lines::left("a\nfuther\nline"));
+    /// let measurements2 = Measurements::new(Dimension::new(6, 3), MeasurementSpecifics::None);
+    ///
+    /// let mut row = Row::empty();
+    /// row.push_back(cell1, measurements1);
+    /// row.push_back(cell2, measurements2);
+    ///
+    /// assert_eq!(row.cells.len(), 2);
+    /// assert_eq!(row.dim, Dimension::new(11, 3));
+    /// assert_eq!(row.cells[0].1.dim, Dimension::new(5, 2));
+    /// assert_eq!(row.cells[1].1.dim, Dimension::new(6, 3));
+    /// ```
+    pub fn push_back(&mut self, cell: Cell, measurement: Measurements) {
+        self.dim = self.dim.horizontal_union(measurement.dim);
+        self.cells.push_back((cell, measurement));
+    }
+
+    /// Adds a [`Cell`]-[`Measurements`] pair to the start of the instance.
+    /// The method implicitly updates the `dim` field.
+    ///
+    /// # Parameters
+    /// - `cell`: The [`Cell`] to prepend
+    /// - `measurements`: The corresponding [`Measurements`]
+    ///
+    /// # Èxample
+    /// ```rust
+    ///
+    /// use termlayout::{Dimension, MeasurementSpecifics, Measurements};
+    /// use termlayout::ext::Row;
+    /// use termlayout::widgets::{Cell, Lines};
+    ///
+    /// let cell1 = Cell::of(Lines::left("first\nline"));
+    /// let measurements1 = Measurements::new(Dimension::new(5, 2), MeasurementSpecifics::None);
+    /// let cell2 = Cell::of(Lines::left("a\nfuther\nline"));
+    /// let measurements2 = Measurements::new(Dimension::new(6, 3), MeasurementSpecifics::None);
+    ///
+    /// let mut row = Row::empty();
+    /// row.push_front(cell1, measurements1);
+    /// row.push_front(cell2, measurements2);
+    ///
+    /// assert_eq!(row.cells.len(), 2);
+    /// assert_eq!(row.dim, Dimension::new(11, 3));
+    /// assert_eq!(row.cells[0].1.dim, Dimension::new(6, 3));
+    /// assert_eq!(row.cells[1].1.dim, Dimension::new(5, 2));
+    /// ```
+    pub fn push_front(&mut self, cell: Cell, measurement: Measurements) {
+        self.dim = self.dim.horizontal_union(measurement.dim);
+        self.cells.push_front((cell, measurement));
+    }
+
+    /// Removes the [`Cell`]-[`Measurements`] pair from the end of the instance.
+    /// The method implicitly updates the `dim` field. This is the inverse operation of
+    /// [`push_back`](Row::push_back)
     ///
     /// # Returns
-    /// A boxed formatted layout for the row
+    /// The removed [`Cell`]-[`Measurements`] pair, if any.
+    ///
+    pub fn pop_back(&mut self) -> Option<(Cell, Measurements)> {
+        let result = self.cells.pop_back();
+        if result.is_some() {
+            self.update_dim();
+        }
+        result
+    }
+
+    /// Removes the [`Cell`]-[`Measurements`] pair from the front of the instance.
+    /// The method implicitly updates the `dim` field. This is the inverse operation of
+    /// [`push_front`](Row::push_front).
+    ///
+    /// # Returns
+    /// The removed [`Cell`]-[`Measurements`] pair, if any.
+    pub fn pop_front(&mut self) -> Option<(Cell, Measurements)> {
+        let result = self.cells.pop_front();
+        if result.is_some() {
+            self.update_dim();
+        }
+        result
+    }
+
+    fn update_dim(&mut self) {
+        self.dim = self
+            .cells
+            .iter()
+            .map(|(_, m)| m.dim)
+            .fold(Dimension::empty(), |a, b| a.horizontal_union(b));
+    }
+
+    /// Fixes the height of each cell in the row to the row's overall height and adjusts
+    /// the `CellDimension` of each cell to its concrete `Fixed` variant.
+    ///
+    /// This is called just before rendering to ensure that all cells in a row share the same
+    /// height and that their dimensions are fully resolved.
+    pub fn fixiate_cell_dims(&mut self) {
+        self.cells.iter_mut().for_each(|(c, m)| {
+            m.dim.height = self.dim.height;
+            let mut content_dim = m.specifics.child().map_or(m.dim, |m| m.dim);
+            if matches!(c.anchor, CellAnchor::Fill) {
+                content_dim = Dimension::new(
+                    max(content_dim.width, m.dim.width),
+                    max(content_dim.height, m.dim.height),
+                );
+                m.specifics = MeasurementSpecifics::Child(Box::new(content_dim.into()));
+            }
+            c.dim = CellDimension::Fixed {
+                cell: m.dim,
+                content: content_dim,
+            }
+        });
+    }
+    /// Returns `true` if this row contains no cells.
     #[must_use]
-    pub fn layout(&self, options: LayoutOptions) -> BoxedFormattedLayout<'static> {
-        FormattedRow::new(&self.cells, options).into()
+    pub fn is_empty(&self) -> bool {
+        self.cells.is_empty()
+    }
+
+    /// Renders a [`LayoutContext`] whose [`Measurements`] specifics contain a list of [`Row`]s
+    /// into a [`BoxedFormattedLayout`].
+    ///
+    /// This is the rendering counterpart to [`crate::ext::HorizontalMetrics`]: the rows
+    /// stored in the measurements are laid out vertically, each row being rendered by a
+    /// `FormattedRow`.
+    ///
+    /// # Parameters
+    /// - `context`: The [`LayoutContext`] containing the options and row-based measurements.
+    ///
+    /// # Returns
+    /// `Some(layout)` if the measurements contain a valid list of rows, `None` otherwise.
+    #[must_use]
+    pub fn layout(context: LayoutContext) -> Option<BoxedFormattedLayout<'static>> {
+        let specifics: Result<Vec<Row>, _> = context.measurements.specifics.try_into();
+        match specifics {
+            Ok(mut rows) => {
+                let mut y = 0;
+                let children = rows
+                    .iter_mut()
+                    .map(|row| {
+                        row.fixiate_cell_dims();
+                        let row_options =
+                            context.options.intersect(Rect::new(0, y, row.dim), false);
+                        y += row.dim.height;
+                        FormattedRow::new(
+                            row.cells.iter().cloned().collect::<Vec<_>>(),
+                            row_options,
+                        )
+                        .into()
+                    })
+                    .collect();
+                Some(
+                    FormattedVertical::new(children, context.options.with_normalized_clip()).into(),
+                )
+            }
+            Err(_) => None,
+        }
     }
 }
 
-struct FormattedRow {
+impl From<Row> for VecDeque<(Cell, Measurements)> {
+    fn from(value: Row) -> Self {
+        value.cells
+    }
+}
+
+pub(crate) struct FormattedRow {
     options: LayoutOptions,
     formatted_cells: Vec<BoxedFormattedLayout<'static>>,
 }
 
 impl FormattedRow {
-    fn new(cells: &[Cell], options: LayoutOptions) -> Self {
-        let visible_rect = options.visible_rect();
+    pub(crate) fn new(cells: Vec<(Cell, Measurements)>, options: LayoutOptions) -> Self {
         let mut col = 0;
-        let mut formatted_cells = Vec::with_capacity(cells.len());
-
-        for (index, cell) in cells.iter().enumerate() {
-            let cell_dim = Dimension::new(cell.visible_content().dim.width, options.dim.height);
-            let cell_clip = Rect::new(col, 0, cell_dim).intersect_relative(visible_rect);
-            let cell_opts = LayoutOptions::new(
-                cell_dim,
-                options.fill_rows || index != cells.len() - 1,
-                cell.effective_wrap_mode(options.wrap_mode),
-                Some(cell_clip),
-            );
-            let cell: BoxedFormattedLayout<'static> =
-                LayoutWithOptions::of(cell.clone().into(), cell_opts).into();
+        let count = cells.len();
+        let mut formatted_cells = Vec::with_capacity(count);
+        for (index, (cell, measurements)) in cells.into_iter().enumerate() {
+            let mut ctxt = LayoutContext::new_with_intersection(&options, col, 0, measurements);
+            ctxt.options.fill_rows = options.fill_rows || index != count - 1;
+            col += ctxt.options.dim.width;
+            let cell: BoxedFormattedLayout =
+                LayoutWithContext::of(cell.clone().into(), ctxt).into();
             formatted_cells.push(cell);
-            col += cell_dim.width;
             if col > options.dim.width {
                 break;
             }
         }
         Self {
-            options: options.with_dim(visible_rect.dim).with_clip(None),
+            options: options.with_normalized_clip(),
             formatted_cells,
         }
     }
@@ -260,233 +317,49 @@ impl<'wrt> LayoutWriter<'wrt> for RowWriter<'wrt> {
 
 #[cfg(test)]
 mod tests {
-    use crate::widgets::horizontal::row::{FormattedRow, Row};
+    use crate::core::measurements::MeasurementSpecifics;
+    use crate::widgets::horizontal::row::FormattedRow;
     use crate::widgets::{Cell, CellAnchor, Lines};
-    use crate::{BoxedFormattedLayout, Dimension, LayoutOptions, Rect};
+    use crate::{BoxedFormattedLayout, Dimension, LayoutOptions, Measurements, Rect, WrapMode};
 
-    fn small_sample_cells() -> Vec<Cell> {
+    fn sample_cells() -> Vec<(Cell, Measurements)> {
         vec![
-            Cell::of(Lines::left("abcdef\nghijkl\nmnopqr\nstuvwx")).with_dim(Dimension::new(6, 4)),
-            Cell::of(Lines::left("123\n456\n789"))
-                .with_dim(Dimension::new(3, 3))
-                .with_anchor(CellAnchor::Center),
-            Cell::of(Lines::left("ABCDE\nFGHIJ\nKLMNO\nPQRST\nUVWXY"))
-                .with_dim(Dimension::new(5, 5)),
+            (
+                Cell::of(Lines::left("abcdef\nghijkl\nmnopqr\nstuvwx"))
+                    .with_dim(Dimension::new(6, 5)),
+                Measurements::new(
+                    Dimension::new(6, 5),
+                    MeasurementSpecifics::Child(Box::new(Dimension::new(6, 4).into())),
+                ),
+            ),
+            (
+                Cell::of(Lines::left("123\n456\n789"))
+                    .with_anchor(CellAnchor::Center)
+                    .with_dim(Dimension::new(3, 5)),
+                Measurements::new(
+                    Dimension::new(3, 5),
+                    MeasurementSpecifics::Child(Box::new(Dimension::new(3, 3).into())),
+                ),
+            ),
+            (
+                Cell::of(Lines::left("ABCDE\nFGHIJ\nKLMNO\nPQRST\nUVWXY"))
+                    .with_dim(Dimension::new(5, 5)),
+                Measurements::new(
+                    Dimension::new(5, 5),
+                    MeasurementSpecifics::Child(Box::new(Dimension::new(5, 5).into())),
+                ),
+            ),
         ]
     }
 
-    fn big_sample_cells() -> Vec<Cell> {
-        vec![
-            Cell::of(Lines::left("abcdefghijkl\nmnopqrstuvwx")).with_dim(Dimension::new(12, 2)),
-            Cell::of(Lines::left("123\n456\n789"))
-                .with_dim(Dimension::new(3, 3))
-                .with_anchor(CellAnchor::Center),
-            Cell::of(Lines::left("ABCDEFGHIJKLMNOPQRSTUVWXY")).with_dim(Dimension::new(25, 1)),
-        ]
-    }
-
     #[test]
-    fn row_from_cells_with_wrap() {
-        // No wrap
-        let cells = big_sample_cells();
-        let rows = Row::from_cells_with_wrap(cells, 50);
-        assert_eq!(rows.len(), 1);
-        assert_eq!(rows[0].cells.len(), 3);
-        assert_eq!(
-            rows[0].cells[0].visible_content(),
-            Rect::new(0, 0, Dimension::new(12, 2))
-        );
-        assert_eq!(
-            rows[0].cells[1].visible_content(),
-            Rect::new(0, 0, Dimension::new(3, 3))
-        );
-        assert_eq!(
-            rows[0].cells[2].visible_content(),
-            Rect::new(0, 0, Dimension::new(25, 1))
-        );
-        assert_eq!(rows[0].dim, Dimension::new(40, 3));
+    fn formatted_row_no_clip_no_fill_rows() {
+        // Arrange
+        let cells = sample_cells();
 
-        // Wrap on cell border
-        let cells = big_sample_cells();
-        let rows = Row::from_cells_with_wrap(cells, 15);
-        assert_eq!(rows.len(), 3);
-        assert_eq!(rows[0].cells.len(), 2);
-        assert_eq!(
-            rows[0].cells[0].visible_content(),
-            Rect::new(0, 0, Dimension::new(12, 2))
-        );
-        assert_eq!(
-            rows[0].cells[1].visible_content(),
-            Rect::new(0, 0, Dimension::new(3, 3))
-        );
-        assert_eq!(rows[0].dim, Dimension::new(15, 3));
-        assert_eq!(rows[1].cells.len(), 1);
-        assert_eq!(
-            rows[1].cells[0].visible_content(),
-            Rect::new(0, 0, Dimension::new(15, 1))
-        );
-        assert_eq!(rows[1].dim, Dimension::new(15, 1));
-        assert_eq!(rows[2].cells.len(), 1);
-        assert_eq!(
-            rows[2].cells[0].visible_content(),
-            Rect::new(15, 0, Dimension::new(10, 1))
-        );
-        assert_eq!(rows[2].dim, Dimension::new(10, 1));
-
-        // Wrap 4 times
-        let cells = big_sample_cells();
-        let rows = Row::from_cells_with_wrap(cells, 10);
-        assert_eq!(rows.len(), 4);
-        assert_eq!(rows[0].cells.len(), 1);
-        assert_eq!(
-            rows[0].cells[0].visible_content(),
-            Rect::new(0, 0, Dimension::new(10, 2))
-        );
-        assert_eq!(rows[0].dim, Dimension::new(10, 2));
-        assert_eq!(rows[1].cells.len(), 3);
-        assert_eq!(
-            rows[1].cells[0].visible_content(),
-            Rect::new(10, 0, Dimension::new(2, 2))
-        );
-        assert_eq!(
-            rows[1].cells[1].visible_content(),
-            Rect::new(0, 0, Dimension::new(3, 3))
-        );
-        assert_eq!(
-            rows[1].cells[2].visible_content(),
-            Rect::new(0, 0, Dimension::new(5, 1))
-        );
-        assert_eq!(rows[1].dim, Dimension::new(10, 3));
-        assert_eq!(rows[2].cells.len(), 1);
-        assert_eq!(
-            rows[2].cells[0].visible_content(),
-            Rect::new(5, 0, Dimension::new(10, 1))
-        );
-        assert_eq!(rows[2].dim, Dimension::new(10, 1));
-        assert_eq!(rows[3].cells.len(), 1);
-        assert_eq!(
-            rows[3].cells[0].visible_content(),
-            Rect::new(15, 0, Dimension::new(10, 1))
-        );
-        assert_eq!(rows[3].dim, Dimension::new(10, 1));
-    }
-
-    #[test]
-    fn row_from_cells_with_truncate() {
-        // Minimal space
-        let cells = big_sample_cells();
-        let rows = Row::from_cells_with_truncate(cells, 3, "...");
-        assert_eq!(rows.len(), 1);
-        assert_eq!(rows[0].cells.len(), 2);
-        assert_eq!(
-            rows[0].cells[0].visible_content(),
-            Rect::new(0, 0, Dimension::new(1, 2))
-        );
-        assert_eq!(
-            rows[0].cells[1].visible_content(),
-            Rect::new(0, 0, Dimension::new(2, 2))
-        );
-        assert_eq!(rows[0].dim, Dimension::new(3, 2));
-
-        // Exact column fit
-        let cells = big_sample_cells();
-        let rows = Row::from_cells_with_truncate(cells, 18, "...");
-        assert_eq!(rows.len(), 1);
-        assert_eq!(rows[0].cells.len(), 3);
-        assert_eq!(
-            rows[0].cells[0].visible_content(),
-            Rect::new(0, 0, Dimension::new(12, 2))
-        );
-        assert_eq!(
-            rows[0].cells[1].visible_content(),
-            Rect::new(0, 0, Dimension::new(3, 3))
-        );
-        assert_eq!(
-            rows[0].cells[2].visible_content(),
-            Rect::new(0, 0, Dimension::new(3, 3))
-        );
-        assert_eq!(rows[0].dim, Dimension::new(18, 3));
-
-        // Part column fit
-        let cells = big_sample_cells();
-        let rows = Row::from_cells_with_truncate(cells, 19, "...");
-        assert_eq!(rows.len(), 1);
-        assert_eq!(rows[0].cells.len(), 4);
-        assert_eq!(
-            rows[0].cells[0].visible_content(),
-            Rect::new(0, 0, Dimension::new(12, 2))
-        );
-        assert_eq!(
-            rows[0].cells[1].visible_content(),
-            Rect::new(0, 0, Dimension::new(3, 3))
-        );
-        assert_eq!(
-            rows[0].cells[2].visible_content(),
-            Rect::new(0, 0, Dimension::new(1, 1))
-        );
-        assert_eq!(
-            rows[0].cells[3].visible_content(),
-            Rect::new(0, 0, Dimension::new(3, 3))
-        );
-        assert_eq!(rows[0].dim, Dimension::new(19, 3));
-
-        // All fits
-        let cells = big_sample_cells();
-        let rows = Row::from_cells_with_truncate(cells, 100, "...");
-        assert_eq!(rows.len(), 1);
-        assert_eq!(rows[0].cells.len(), 4);
-        assert_eq!(
-            rows[0].cells[0].visible_content(),
-            Rect::new(0, 0, Dimension::new(12, 2))
-        );
-        assert_eq!(
-            rows[0].cells[1].visible_content(),
-            Rect::new(0, 0, Dimension::new(3, 3))
-        );
-        assert_eq!(
-            rows[0].cells[2].visible_content(),
-            Rect::new(0, 0, Dimension::new(25, 1))
-        );
-        assert_eq!(
-            rows[0].cells[3].visible_content(),
-            Rect::new(0, 0, Dimension::new(3, 3))
-        );
-        assert_eq!(rows[0].dim, Dimension::new(43, 3));
-    }
-
-    #[test]
-    fn row_collect_complete_cells_for_row() {
-        let cells = big_sample_cells();
-
-        let (index, dim) = Row::collect_complete_cells_for_row(&cells, 10);
-        assert_eq!(index, 0);
-        assert_eq!(dim, Dimension::empty());
-
-        let (index, dim) = Row::collect_complete_cells_for_row(&cells, 12);
-        assert_eq!(index, 1);
-        assert_eq!(dim, Dimension::new(12, 2));
-
-        let (index, dim) = Row::collect_complete_cells_for_row(&cells, 14);
-        assert_eq!(index, 1);
-        assert_eq!(dim, Dimension::new(12, 2));
-
-        let (index, dim) = Row::collect_complete_cells_for_row(&cells, 25);
-        assert_eq!(index, 2);
-        assert_eq!(dim, Dimension::new(15, 3));
-
-        let (index, dim) = Row::collect_complete_cells_for_row(&cells, 100);
-        assert_eq!(index, 3);
-        assert_eq!(dim, Dimension::new(40, 3));
-    }
-
-    #[test]
-    fn formatted_row_no_clip() {
-        let cells = small_sample_cells();
-        let options = LayoutOptions::default()
-            .with_dim(Dimension::new(14, 6))
-            .with_fill_rows(false);
-
-        let formatted: BoxedFormattedLayout = FormattedRow::new(&cells, options).into();
+        // Act
+        let options = LayoutOptions::new(Dimension::new(20, 6), false, WrapMode::default(), None);
+        let formatted: BoxedFormattedLayout = FormattedRow::new(cells, options).into();
 
         assert_eq!(
             format!("{formatted}"),
@@ -496,29 +369,76 @@ mod tests {
                 "mnopqr456KLMNO\n",
                 "stuvwx789PQRST\n",
                 "         UVWXY\n",
-                "         \n"
+                "\n"
             )
-        );
+        )
     }
 
     #[test]
-    fn formatted_row_with_clip() {
-        let cells = small_sample_cells();
-        let options = LayoutOptions::default()
-            .with_dim(Dimension::new(14, 6))
-            .with_fill_rows(false)
-            .with_clip(Some(Rect::new(2, 1, Dimension::new(10, 4))));
+    fn formatted_row_no_clip_fill_rows() {
+        // Arrange
+        let cells = sample_cells();
 
-        let formatted: BoxedFormattedLayout = FormattedRow::new(&cells, options).into();
+        // Act
+        let options = LayoutOptions::new(Dimension::new(20, 6), true, WrapMode::default(), None);
+        let formatted: BoxedFormattedLayout = FormattedRow::new(cells, options).into();
 
         assert_eq!(
             format!("{formatted}"),
             concat!(
-                "ijkl123FGH\n", //
-                "opqr456KLM\n", //
-                "uvwx789PQR\n", //
-                "       UVW\n", //
+                "abcdef   ABCDE      \n",
+                "ghijkl123FGHIJ      \n",
+                "mnopqr456KLMNO      \n",
+                "stuvwx789PQRST      \n",
+                "         UVWXY      \n",
+                "                    \n"
             )
+        )
+    }
+
+    #[test]
+    fn formatted_row_with_clip_no_fill_rows() {
+        // Arrange
+        let cells = sample_cells();
+
+        // Act
+        let options = LayoutOptions::new(
+            Dimension::new(20, 6),
+            false,
+            WrapMode::default(),
+            Some(Rect::new(2, 1, Dimension::new(8, 3))),
         );
+        let formatted: BoxedFormattedLayout = FormattedRow::new(cells, options).into();
+
+        assert_eq!(
+            format!("{formatted}"),
+            concat!("ijkl123F\n", "opqr456K\n", "uvwx789P\n",)
+        )
+    }
+
+    #[test]
+    fn formatted_row_with_clip_fill_rows() {
+        // Arrange
+        let cells = sample_cells();
+
+        // Act
+        let options = LayoutOptions::new(
+            Dimension::new(20, 6),
+            true,
+            WrapMode::default(),
+            Some(Rect::new(2, 1, Dimension::new(15, 5))),
+        );
+        let formatted: BoxedFormattedLayout = FormattedRow::new(cells, options).into();
+
+        assert_eq!(
+            format!("{formatted}"),
+            concat!(
+                "ijkl123FGHIJ   \n",
+                "opqr456KLMNO   \n",
+                "uvwx789PQRST   \n",
+                "       UVWXY   \n",
+                "               \n"
+            )
+        )
     }
 }

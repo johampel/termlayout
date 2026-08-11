@@ -1,8 +1,12 @@
+pub(crate) mod dimension;
 mod formatted;
 pub(crate) mod metrics;
 
+use crate::core::measurements::MeasurementSpecifics;
+use crate::widgets::{CellDimension, CellWidth};
 use crate::{
-    BoxedFormattedLayout, Dimension, Layout, LayoutOptions, RcLayout, Rect, WrapMode, rc_layout,
+    BoxedFormattedLayout, Dimension, Layout, LayoutContext, MeasureMode, Measurements, RcLayout,
+    Rect, WrapMode, rc_layout,
 };
 use std::any::Any;
 use std::cmp::min;
@@ -39,7 +43,7 @@ use std::cmp::min;
 /// to match the constraints of the anchor.
 ///
 /// All these calculations also respect the `clip` field (which contains the optional clipping of
-/// the content) and all the other settings of the [`LayoutOptions`] that is active during the layout
+/// the content) and all the other settings of the [`crate::LayoutOptions`] that is active during the layout
 /// process.
 ///
 /// # Example
@@ -415,26 +419,6 @@ impl Cell {
         self.wrap_mode.unwrap_or(wrap_mode)
     }
 
-    /// Calculates the cell and content dimension based on the provided maximum width and wrap mode.
-    ///
-    /// # Parameters
-    /// - `max_width`: The maximum width in terms of columns; if set to `None`, the dimension is
-    ///   calculated based on the minimum size of the content.
-    /// - `wrap_mode`: The default [`WrapMode`] that is used in case the cell's wrap mode is not set.
-    ///
-    /// # Returns
-    /// The calculated dimension of the cell and content based on the provided parameters.
-    /// The first is the cell's dimension and the second is the content's dimension.
-    #[must_use]
-    pub fn calculate_dims(
-        &self,
-        max_width: Option<usize>,
-        wrap_mode: WrapMode,
-    ) -> (Dimension, Dimension) {
-        let wrap_mode = self.effective_wrap_mode(wrap_mode);
-        self.dim.calculate_dims(&self.content, max_width, wrap_mode)
-    }
-
     /// Returns the visible content rectangle of the cell.
     /// This is the intersection of the content's dimension and the cell's clip rectangle, if set.
     /// If the cell has no clip rectangle, it returns the content's dimension. If the content
@@ -622,31 +606,45 @@ impl From<RcLayout> for Cell {
 }
 
 impl Layout for Cell {
-    fn pref_dim(&self, max_width: usize, wrap_mode: WrapMode) -> Dimension {
-        let (mut dim, _) = self.calculate_dims(Some(max_width), wrap_mode);
-        dim.width = min(dim.width, max_width);
-        dim
+    fn measure(&self, mode: MeasureMode) -> Measurements {
+        if mode.is_empty() {
+            return Measurements::empty()
+                .with_specifics(MeasurementSpecifics::Child(Measurements::empty().into()));
+        }
+        self.dim.measure(
+            &self.content,
+            mode.with_wrap_mode(self.effective_wrap_mode(mode.wrap_mode())),
+        )
     }
 
-    fn min_dim(&self) -> Dimension {
-        self.calculate_dims(None, WrapMode::Wrap).0
-    }
+    fn layout_with_context(&'_ self, context: LayoutContext) -> BoxedFormattedLayout<'_> {
+        let specifics: Result<Measurements, _> = context.measurements.specifics.try_into();
+        match specifics {
+            Ok(child_measurements) => {
+                let metrics = metrics::CellMetrics::new(
+                    &context.options,
+                    child_measurements.dim,
+                    self.clip,
+                    self.anchor,
+                );
+                let child_options = metrics.content_options(
+                    context.options.fill_rows,
+                    self.effective_wrap_mode(context.options.wrap_mode),
+                );
+                let child_context = LayoutContext::new(child_options, child_measurements.clone());
+                let formatted_content = self.content.layout_with_context(child_context);
 
-    fn layout_strict(&'_ self, options: LayoutOptions) -> BoxedFormattedLayout<'_> {
-        let (_, content_dim) = self.calculate_dims(Some(options.dim.width), options.wrap_mode);
-        let metrics = metrics::CellMetrics::new(&options, content_dim, self.clip, self.anchor);
-        let content_options = metrics.content_options(
-            options.fill_rows,
-            self.effective_wrap_mode(options.wrap_mode),
-        );
-        let cell_options = metrics.cell_options(options.fill_rows, options.wrap_mode);
-
-        let formatted_content = self.content.layout_strict(content_options);
-        Box::new(formatted::FormattedCell::new(
-            formatted_content,
-            metrics.padding,
-            cell_options,
-        ))
+                // Build final FormattedLayout
+                let cell_options =
+                    metrics.cell_options(context.options.fill_rows, context.options.wrap_mode);
+                Box::new(formatted::FormattedCell::new(
+                    formatted_content,
+                    metrics.padding,
+                    cell_options,
+                ))
+            }
+            Err(_) => self.layout_strict(context.options),
+        }
     }
 
     fn as_any(&self) -> &dyn Any {
@@ -817,219 +815,14 @@ impl CellAnchor {
     }
 }
 
-/// Defines the dimension of the content of a [`Cell`].
-/// The dimension might be a plain fixed [`Dimension`], which provides concrete values for
-/// the width and height, or it might be a [`CellWidth`] that describes how the width is computed.
-///
-/// Instances of this enum can be created using the `From` trait implementation,
-/// where the source is either a [`Dimension`] or a [`CellWidth`].
-///
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub enum CellDimension {
-    /// The dimension of the cell and its content is fixed and defined by the given [`Dimension`].
-    Fixed {
-        /// The [`Dimension`] of the cell.
-        cell: Dimension,
-        /// The [`Dimension`] of the content.
-        content: Dimension,
-    },
-
-    /// The dimension of the cell is computed based on the given [`CellWidth`]. The exact sizing
-    /// behavior depends on the usage.
-    Declarative(CellWidth),
-}
-
-impl CellDimension {
-    /// Returns the [`Dimension`]s of the cell and content, if known.
-    /// For the `Fixed` variant it returns the `Dimension`s, otherwise `None`
-    ///
-    /// # Returns
-    /// The `Dimension`s (cell, content) or `None`
-    #[must_use]
-    pub fn dims(&self) -> Option<(Dimension, Dimension)> {
-        match self {
-            CellDimension::Fixed { cell, content } => Some((*cell, *content)),
-            CellDimension::Declarative(_) => None,
-        }
-    }
-
-    /// Returns the declarative [`CellWidth`] of the dimension.
-    /// If the dimension is fixed, returns `CellWidth::Fixed` with the fixed dimension's width
-    ///
-    /// # Returns
-    /// The [`CellWidth`]
-    ///
-    /// # Example
-    /// ```rust
-    ///
-    /// use termlayout::Dimension;
-    /// use termlayout::widgets::{CellDimension, CellWidth};
-    ///
-    /// let dim = CellDimension::Declarative(CellWidth::Minimal);
-    /// assert_eq!(dim.cell_width(), CellWidth::Minimal);
-    ///
-    /// let dim = CellDimension::Fixed{cell: Dimension::new(17, 13), content: Dimension::new(11, 9)};
-    /// assert_eq!(dim.cell_width(), CellWidth::Fixed(17));
-    /// ```
-    #[must_use]
-    pub fn cell_width(&self) -> CellWidth {
-        match self {
-            CellDimension::Fixed { cell, content } => {
-                if cell.width >= content.width {
-                    CellWidth::Fixed(cell.width)
-                } else {
-                    CellWidth::Preferred(cell.width)
-                }
-            }
-            CellDimension::Declarative(width) => *width,
-        }
-    }
-
-    /// Checks, whether this instance is a fill dimension
-    ///
-    /// # Returns
-    /// `true`, if this is a `CellDimension::Declarative(CellWidth::Fill)`
-    #[must_use]
-    pub fn is_fill(&self) -> bool {
-        matches!(self, CellDimension::Declarative(CellWidth::Fill))
-    }
-
-    /// Calculates the cell and content [`Dimension`] for the given `content`, `max_width`, and
-    /// `wrap_mode`.
-    ///
-    /// # Parameters
-    /// - `content`: The [`RcLayout`] of the cell content being laid out with this
-    ///   [`CellWidth`].
-    /// - `max_width`: The maximum width in terms of columns; if set to `None`, the dimension is
-    ///   calculated based on the minimum size of the content.
-    /// - `wrap_mode`: The default [`WrapMode`] that is used in case the cell's wrap mode is not set.
-    ///
-    /// # Returns
-    /// The calculated [`Dimension`] for the cell and content.
-    #[must_use]
-    pub fn calculate_dims(
-        &self,
-        content: &RcLayout,
-        max_width: Option<usize>,
-        wrap_mode: WrapMode,
-    ) -> (Dimension, Dimension) {
-        match self {
-            CellDimension::Fixed { cell, content } => (*cell, *content),
-            CellDimension::Declarative(width) => {
-                width.calculate_dims(content, max_width, wrap_mode)
-            }
-        }
-    }
-}
-
-impl From<Dimension> for CellDimension {
-    fn from(dim: Dimension) -> Self {
-        CellDimension::Fixed {
-            cell: dim,
-            content: dim,
-        }
-    }
-}
-
-impl From<CellWidth> for CellDimension {
-    fn from(width: CellWidth) -> Self {
-        CellDimension::Declarative(width)
-    }
-}
-
-/// Defines the width of the content of a [`Cell`].
-/// Using this enum, it is possible to define the width of the cell's content as a fixed value or a
-/// dynamic one that depends on the available space and usage.
-#[derive(Clone, Copy, Debug, Default, PartialEq)]
-pub enum CellWidth {
-    /// The width of the cell content is the same as the minimum width of its content, as
-    /// returned by [`min_dim()`](Layout::min_dim)
-    #[default]
-    Minimal,
-
-    /// The width of the cell content is exactly the width specified with `value`.
-    Fixed(usize),
-
-    /// The width of the cell content is the same as the preferred width of the content,
-    /// as returned by [`pref_dim()`](Layout::pref_dim) for the given `value`. Note that this is a
-    /// subtile way different from `Fixed`, since the actual width might be smaller than `value`.
-    Preferred(usize),
-
-    /// The width of the cell content is proportional to the width of the
-    /// entire available width. It depends on the usage what the entire available width is.
-    /// The actual width is `value` times the width of the available width, so if - for example - the
-    /// available width has a width of 100, and the cell is set to `Proportional(0.5)`, the cell
-    /// will have a width of 50.
-    Proportional(f32),
-
-    /// The width of the cell content is calculated so that it fills the available width.
-    /// Depending on the usage - for example in a table - the available width is the the width of
-    /// a table row without the widths of the other cells in the row, devided by the number of cells
-    /// with the `Fill` width.
-    Fill,
-}
-
-impl CellWidth {
-    /// Calculates the cell and content [`Dimension`] for the given `content`, `max_width`, and
-    /// `wrap_mode`.
-    ///
-    /// # Parameters
-    /// - `content`: The [`RcLayout`] of the cell content being laid out with this
-    ///   [`CellWidth`].
-    /// - `max_width`: The maximum width in terms of columns; if set to `None`, the dimension is
-    ///   calculated based on the minimum size of the content.
-    /// - `wrap_mode`: The default [`WrapMode`] that is used in case the cell's wrap mode is not set.
-    ///
-    /// # Returns
-    /// The calculated [`Dimension`] for the cell and content.
-    #[allow(clippy::missing_panics_doc)]
-    #[allow(clippy::cast_possible_truncation)]
-    #[allow(clippy::cast_sign_loss)]
-    #[allow(clippy::cast_precision_loss)]
-    #[must_use]
-    pub fn calculate_dims(
-        &self,
-        content: &RcLayout,
-        max_width: Option<usize>,
-        wrap_mode: WrapMode,
-    ) -> (Dimension, Dimension) {
-        match self {
-            CellWidth::Fixed(w) => {
-                let dim = content.pref_dim_fixed_width(*w, wrap_mode);
-                (dim, dim)
-            }
-            CellWidth::Proportional(p) if max_width.is_some() => {
-                let w = (max_width.unwrap() as f32 * p) as usize;
-                let content = content.pref_dim(w, wrap_mode);
-                let cell = Dimension::new(w, content.height);
-                (cell, content)
-            }
-            CellWidth::Fill if max_width.is_some() => {
-                let w = max_width.unwrap();
-                let content = content.pref_dim(w, wrap_mode);
-                let cell = Dimension::new(w, content.height);
-                (cell, content)
-            }
-            CellWidth::Preferred(w) => {
-                let content = content.pref_dim(*w, wrap_mode);
-                let cell = Dimension::new(*w, content.height);
-                (cell, content)
-            }
-            _ => {
-                let dim = content.min_dim();
-                (dim, dim)
-            }
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::LayoutOptions;
     use crate::widgets::Lines;
 
     #[test]
-    fn cell_pref_dim() {
+    fn cell_measure_pref_width() {
         let content: RcLayout = Lines::left("abcde\nfghij").into();
 
         let cell = Cell::new(
@@ -1039,7 +832,10 @@ mod tests {
             None,
             CellAnchor::Center,
         );
-        assert_eq!(cell.pref_dim(4, WrapMode::Wrap), Dimension::new(4, 4));
+        assert_eq!(
+            cell.measure(MeasureMode::pref_width(4, WrapMode::Wrap)).dim,
+            Dimension::new(4, 4)
+        );
 
         let cell = Cell::new(
             content.clone(),
@@ -1048,11 +844,15 @@ mod tests {
             None,
             CellAnchor::NorthWest,
         );
-        assert_eq!(cell.pref_dim(20, WrapMode::Wrap), Dimension::new(10, 2));
+        assert_eq!(
+            cell.measure(MeasureMode::pref_width(20, WrapMode::Wrap))
+                .dim,
+            Dimension::new(10, 2)
+        );
     }
 
     #[test]
-    fn cell_min_dim() {
+    fn cell_measure_min() {
         let content: RcLayout = Lines::left("abcde\nfghij").into();
 
         let cell = Cell::new(
@@ -1062,7 +862,7 @@ mod tests {
             None,
             CellAnchor::Center,
         );
-        assert_eq!(cell.min_dim(), Dimension::new(5, 2));
+        assert_eq!(cell.measure(MeasureMode::min()).dim, Dimension::new(5, 2));
 
         let cell = Cell::new(
             content.clone(),
@@ -1071,7 +871,7 @@ mod tests {
             None,
             CellAnchor::NorthWest,
         );
-        assert_eq!(cell.min_dim(), Dimension::new(10, 2));
+        assert_eq!(cell.measure(MeasureMode::min()).dim, Dimension::new(10, 2));
     }
 
     #[test]

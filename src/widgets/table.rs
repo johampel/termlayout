@@ -1,9 +1,10 @@
+use crate::ext::Row;
 use crate::widgets::table::decoration::DecoratedTable;
 use crate::widgets::table::metrics::TableMetrics;
-use crate::widgets::vertical::FormattedVertical;
 use crate::widgets::{CellAnchor, CellWidth, TableDecoration};
 use crate::{
-    BoxedFormattedLayout, Dimension, Layout, LayoutOptions, RcLayout, Rect, WrapMode, rc_layout,
+    BoxedFormattedLayout, Dimension, Layout, LayoutContext, MeasureMode, MeasurementSpecifics,
+    Measurements, RcLayout, WrapMode, rc_layout,
 };
 use std::any::Any;
 
@@ -69,49 +70,25 @@ impl Table {
 }
 
 impl Layout for Table {
-    fn pref_dim(&self, max_width: usize, wrap_mode: WrapMode) -> Dimension {
-        let table = DecoratedTable::new(self);
-        let metrics = TableMetrics::new(&table, Some(max_width), wrap_mode);
-        let dim = metrics.dim();
-        if dim.width <= max_width {
-            return dim;
+    fn measure(&self, mode: MeasureMode) -> Measurements {
+        if mode.is_empty() {
+            return Measurements::empty().with_specifics(MeasurementSpecifics::Rows(vec![]));
         }
-
-        (0..table.rows)
-            .map(|r| {
-                metrics
-                    .row(r, max_width, wrap_mode)
-                    .iter()
-                    .fold(Dimension::empty(), |acc, row| acc.vertical_union(row.dim))
-            })
-            .fold(Dimension::empty(), |acc, row| acc.vertical_union(row))
+        let table = DecoratedTable::new(self);
+        let metrics = TableMetrics::new(&table, mode);
+        let rows = metrics.all_rows(mode);
+        let dim = rows
+            .iter()
+            .map(|row| row.dim)
+            .fold(Dimension::empty(), |acc, dim| acc.vertical_union(dim));
+        Measurements::new(dim, MeasurementSpecifics::Rows(rows))
     }
 
-    fn min_dim(&self) -> Dimension {
-        let table = DecoratedTable::new(self);
-        let metrics = TableMetrics::new(&table, None, WrapMode::Wrap);
-        metrics.dim()
-    }
-
-    fn layout_strict(&'_ self, options: LayoutOptions) -> BoxedFormattedLayout<'_> {
-        let table = DecoratedTable::new(self);
-        let metrics = TableMetrics::new(&table, Some(options.dim.width), options.wrap_mode);
-        let rows = metrics.all_rows(options.dim.width, options.wrap_mode);
-
-        if rows.len() == 1 {
-            return rows[0].layout(options);
+    fn layout_with_context(&'_ self, context: LayoutContext) -> BoxedFormattedLayout<'_> {
+        match &context.measurements.specifics {
+            MeasurementSpecifics::Rows(_) => Row::layout(context).unwrap(),
+            _ => self.layout_strict(context.options),
         }
-
-        let mut offset = 0;
-        let formatted = rows
-            .into_iter()
-            .map(|row| {
-                let row_options = options.intersect(Rect::new(0, offset, row.dim), false);
-                offset += row.dim.height;
-                row.layout(row_options)
-            })
-            .collect();
-        FormattedVertical::new(formatted, options.with_normalized_clip()).into()
     }
 
     fn as_any(&self) -> &dyn Any {
@@ -243,6 +220,17 @@ impl Default for TableColumn {
 mod tests {
     use crate::widgets::table::*;
     use crate::widgets::{Filler, Lines};
+    use crate::{Dimension, LayoutOptions, MeasureMode, Rect, WrapMode};
+
+    // Helper: creates a single-row, N-column table using headless_no_grid decoration
+    // (one space separator between columns, no borders, no header rows).
+    fn headless_table(widths: Vec<CellWidth>, cells: Vec<RcLayout>) -> Table {
+        let columns = widths
+            .into_iter()
+            .map(|w| TableColumn::default().with_width(w))
+            .collect();
+        Table::new(TableDecoration::headless_no_grid(), columns, vec![cells])
+    }
 
     #[test]
     fn table_layout_fit_with_anchor() {
@@ -411,7 +399,7 @@ mod tests {
             result,
             concat!(
                 "┌─────────────┬──────────┬───────…\n",
-                "│    Col 1    │  Col 2   │    Col…\n",
+                "│    Col 1    │  Col 2   │ Col 3 …\n",
                 "├─────────────┼──────────┼───────…\n",
                 "│abcdefghijklm│0101010101│ABCDEFG…\n",
                 "│nopqrstuvwxyz│0101010101│NOPQRST…\n",
@@ -426,14 +414,14 @@ mod tests {
         let formatted = table.layout_strict(LayoutOptions::new(
             Dimension::new(34, 8),
             true,
-            WrapMode::default(),
+            WrapMode::default_truncate(),
             Some(Rect::new(2, 1, Dimension::new(30, 5))),
         ));
         let result = format!("{formatted}");
         assert_eq!(
             result,
             concat!(
-                "   Col 1    │  Col 2   │    Co\n",
+                "   Col 1    │  Col 2   │ Col 3\n",
                 "────────────┼──────────┼──────\n",
                 "bcdefghijklm│0101010101│ABCDEF\n",
                 "opqrstuvwxyz│0101010101│NOPQRS\n",
@@ -560,5 +548,203 @@ mod tests {
         );
 
         assert_eq!(format!("{}", table.layout(0)), "");
+    }
+
+    // -- Fill column width distribution tests -------------------------------------------------------
+
+    /// A single Fill column takes all space left after fixed-width and decoration columns.
+    ///
+    /// Layout (headless_no_grid, 1-char separator, `fill_rows=true`):
+    /// ```text
+    /// abc x     ← col0(Minimal)=3, sep=1, col1(Fill)=6  →  total 10
+    /// ```
+    #[test]
+    fn fill_single_col_takes_remaining_space() {
+        // Using fill_rows=true so each cell is padded to its assigned column width.
+        // col0="abc" fills 3 chars; col1="x" fills 1 char and is padded to 6 (fill col).
+        let table = headless_table(
+            vec![CellWidth::Minimal, CellWidth::Fill],
+            vec![Lines::left("abc").into(), Lines::left("x").into()],
+        );
+        let result = format!(
+            "{}",
+            table.layout_strict(LayoutOptions::new(
+                Dimension::new(10, 1),
+                true,
+                WrapMode::default_truncate(),
+                None,
+            ))
+        );
+        assert_eq!(result, "abc x     \n");
+    }
+
+    /// Two Fill columns split the remaining space evenly.
+    ///
+    /// Layout (headless_no_grid, 1-char separator, total width 11, `fill_rows=true`):
+    /// ```text
+    /// A     B    ← col0(Fill)=5, sep=1, col1(Fill)=5  →  total 11
+    /// ```
+    #[test]
+    fn fill_two_cols_split_evenly() {
+        let table = headless_table(
+            vec![CellWidth::Fill, CellWidth::Fill],
+            vec![Lines::left("A").into(), Lines::left("B").into()],
+        );
+        let result = format!(
+            "{}",
+            table.layout_strict(LayoutOptions::new(
+                Dimension::new(11, 1),
+                true,
+                WrapMode::default_truncate(),
+                None,
+            ))
+        );
+        assert_eq!(result, "A     B    \n");
+    }
+
+    /// When the remaining space cannot be split evenly, the last Fill column gets the extra char.
+    ///
+    /// Layout (headless_no_grid, 1-char separator, total width 12, `fill_rows=true`):
+    /// ```text
+    /// A     B     ← col0(Fill)=5, sep=1, col1(Fill)=6  →  total 12
+    /// ```
+    #[test]
+    fn fill_two_cols_odd_remainder_last_col_gets_more() {
+        let table = headless_table(
+            vec![CellWidth::Fill, CellWidth::Fill],
+            vec![Lines::left("A").into(), Lines::left("B").into()],
+        );
+        let result = format!(
+            "{}",
+            table.layout_strict(LayoutOptions::new(
+                Dimension::new(12, 1),
+                true,
+                WrapMode::default_truncate(),
+                None,
+            ))
+        );
+        assert_eq!(result, "A     B     \n");
+    }
+
+    /// Three Fill columns distribute remaining space using the iterative halving algorithm:
+    /// first column gets the floor share; the remainder propagates to the next columns.
+    ///
+    /// Layout (headless_no_grid, 2 separators, total width 32, `fill_rows=true`):
+    /// ```text
+    /// A         B         C          ← each col=10, 2 seps  →  total 32
+    /// ```
+    #[test]
+    fn fill_three_cols_distribute_remaining_space() {
+        let table = Table::new(
+            TableDecoration::headless_no_grid(),
+            vec![
+                TableColumn::default().with_width(CellWidth::Fill),
+                TableColumn::default().with_width(CellWidth::Fill),
+                TableColumn::default().with_width(CellWidth::Fill),
+            ],
+            vec![vec![
+                Lines::left("A").into(),
+                Lines::left("B").into(),
+                Lines::left("C").into(),
+            ]],
+        );
+        let result = format!(
+            "{}",
+            table.layout_strict(LayoutOptions::new(
+                Dimension::new(32, 1),
+                true,
+                WrapMode::default_truncate(),
+                None,
+            ))
+        );
+        assert_eq!(result, "A          B          C         \n");
+    }
+
+    /// A Fill column receives the minimum width of 1 when fixed columns already consume all
+    /// available space (or more). This was previously broken by a `%` operator precedence bug
+    /// and then by a subtraction overflow when computing the per-column fill remainder.
+    #[test]
+    fn fill_col_gets_minimum_width_when_fixed_cols_exceed_max() {
+        // col0 content is 30 chars wide → Minimal width = 30; with sep = 31 fixed chars total.
+        // max_width = 20 < 31, so saturating_sub gives fill_width = 0.
+        // fill_count = 1, so checked_div(1).max(1) = 1 → Fill col gets width 1.
+        // The subsequent update fill_width = 0 - 1 previously caused an underflow panic.
+        let table = headless_table(
+            vec![CellWidth::Minimal, CellWidth::Fill],
+            vec![Lines::left(&"a".repeat(30)).into(), Lines::left("x").into()],
+        );
+        // Must not panic. The Fill column is assigned the minimum width of 1.
+        let dim = table
+            .measure(MeasureMode::fixed_width(20, WrapMode::default_truncate()))
+            .dim;
+        assert!(dim.height > 0);
+        assert!(dim.width > 0);
+    }
+
+    /// With `MeasureMode::Min` there is no max-width, so Fill columns fall back to measuring
+    /// their content minimally (same as `CellWidth::Minimal`).
+    #[test]
+    fn fill_col_with_min_mode_falls_back_to_minimal() {
+        // Both cells contain 3-char text; col0 is Minimal and col1 is Fill (→ also Minimal here).
+        // Expected dim: width = 3 + 1(sep) + 3 = 7, height = 1.
+        let table = headless_table(
+            vec![CellWidth::Minimal, CellWidth::Fill],
+            vec![Lines::left("abc").into(), Lines::left("xyz").into()],
+        );
+        let dim = table.measure(MeasureMode::Min).dim;
+        assert_eq!(dim.width, 7);
+        assert_eq!(dim.height, 1);
+    }
+
+    /// A Proportional column receives the given fraction of the total available width.
+    ///
+    /// Layout (headless_no_grid, available width 20):
+    /// - col0 = Proportional(0.5) → 10 chars
+    /// - sep = 1 char
+    /// - col1 = Minimal("abc") → 3 chars
+    /// - Natural table width = 14
+    #[test]
+    fn proportional_col_gets_fraction_of_available_width() {
+        // Proportional(0.5) is computed relative to the measure-mode width (20).
+        // col0 = floor(20 * 0.5) = 10.  Natural total width = 10 + 1 + 3 = 14.
+        let table = headless_table(
+            vec![CellWidth::Proportional(0.5), CellWidth::Minimal],
+            vec![Lines::left("x").into(), Lines::left("abc").into()],
+        );
+        let dim = table
+            .measure(MeasureMode::fixed_width(20, WrapMode::default_truncate()))
+            .dim;
+        assert_eq!(dim.width, 14); // 10 + 1(sep) + 3 = 14
+    }
+
+    /// The height of a row is determined by the tallest cell in that row.
+    #[test]
+    fn row_height_equals_tallest_cell() {
+        // col0: 1-line cell; col1: 3-line cell → row height = 3.
+        // No decoration rows in headless_no_grid → total height = 3.
+        let table = headless_table(
+            vec![CellWidth::Minimal, CellWidth::Minimal],
+            vec![
+                Lines::left("a").into(),
+                Lines::left("line1\nline2\nline3").into(),
+            ],
+        );
+        let dim = table.measure(MeasureMode::Min).dim;
+        assert_eq!(dim.height, 3);
+        // Width: 1(col0) + 1(sep) + 5(col1) = 7
+        assert_eq!(dim.width, 7);
+    }
+
+    /// A fixed-width column always uses exactly the specified width, regardless of content.
+    #[test]
+    fn fixed_col_uses_specified_width() {
+        // col0: Fixed(8), content "abc" (3 chars) → still rendered at width 8.
+        // col1: Minimal, content "xy" → width 2.  Total = 8 + 1 + 2 = 11.
+        let table = headless_table(
+            vec![CellWidth::Fixed(8), CellWidth::Minimal],
+            vec![Lines::left("abc").into(), Lines::left("xy").into()],
+        );
+        let dim = table.measure(MeasureMode::Min).dim;
+        assert_eq!(dim.width, 11);
     }
 }
