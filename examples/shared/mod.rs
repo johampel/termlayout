@@ -6,7 +6,7 @@
 
 use std::io::Write;
 use std::sync::Mutex;
-use termlayout::ext::{Color, Effect, Style, TextBuilder};
+use termlayout::ext::{Effect, Style, TextBuilder};
 use termlayout::widgets::{Filler, Paragraph, Vertical};
 use termlayout::{Layout, widgets};
 
@@ -72,13 +72,7 @@ impl Menu {
         T: AsRef<str>,
     {
         let mut error = TextBuilder::new();
-        error.push_style(
-            Style::default()
-                .with_effect(Effect::Bold)
-                .with_foreground(Color::Red),
-        );
-        error.append(message);
-        error.pop_last_style();
+        error.bold().red().append(message).pop_style().pop_style();
         println!("{}", error.as_ref());
     }
 

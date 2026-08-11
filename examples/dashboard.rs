@@ -6,7 +6,7 @@
 //! cargo run --example dashboard
 //! ```
 
-use termlayout::ext::{Color, Effect, Style, TextBuilder};
+use termlayout::ext::TextBuilder;
 use termlayout::widgets::{
     Cell, CellAnchor, CellWidth, Filler, Frame, FrameDecoration, Horizontal, Lines, List,
     Paragraph, Table, TableColumn, TableDecoration, Vertical,
@@ -16,22 +16,19 @@ use termlayout::{Layout, RcLayout, WrapMode};
 fn main() {
     // 1. Build a styled Header using TextBuilder
     let mut header_builder = TextBuilder::new();
-    header_builder.push_style(
-        Style::default()
-            .with_foreground(Color::Cyan)
-            .with_effect(Effect::Bold),
-    );
-    header_builder.append(" 🖥️  SYSTEM CONTROL DASHBOARD ");
-    header_builder.pop_last_style();
-    header_builder.push_style(
-        Style::default()
-            .with_foreground(Color::White)
-            .with_effect(Effect::Dim),
-    );
-    header_builder.append(" | v0.1.0 | ");
-    header_builder.pop_last_style();
-    header_builder.push_style(Style::default().with_foreground(Color::Yellow));
-    header_builder.append("Status: ONLINE ");
+    header_builder
+        .cyan()
+        .bold()
+        .append(" 🖥️  SYSTEM CONTROL DASHBOARD ")
+        .pop_style()
+        .pop_style()
+        .white()
+        .dim()
+        .append(" | v0.1.0 | ")
+        .pop_style()
+        .pop_style()
+        .yellow()
+        .append("Status: ONLINE ");
 
     // Convert current builder content to layout
     let header_text = Lines::center(header_builder.as_ref().to_string());
@@ -40,40 +37,28 @@ fn main() {
     // 2. Build the Sidebar (Left Column)
     // Quick statistics with colored badges using TextBuilder
     let mut item1 = TextBuilder::new();
-    item1.append("CPU Usage:  ");
-    item1.push_style(
-        Style::default()
-            .with_foreground(Color::Green)
-            .with_effect(Effect::Bold),
-    );
-    item1.append("⚡ 14% ");
+    item1
+        .append("CPU Usage:  ")
+        .green()
+        .bold()
+        .append("⚡ 14% ");
 
     let mut item2 = TextBuilder::new();
-    item2.append("Memory:     ");
-    item2.push_style(
-        Style::default()
-            .with_foreground(Color::Green)
-            .with_effect(Effect::Bold),
-    );
-    item2.append("📟 4.2/16 GB ");
+    item2
+        .append("Memory:     ")
+        .green()
+        .bold()
+        .append("📟 4.2/16 GB ");
 
     let mut item3 = TextBuilder::new();
-    item3.append("Disk Space: ");
-    item3.push_style(
-        Style::default()
-            .with_foreground(Color::Yellow)
-            .with_effect(Effect::Bold),
-    );
-    item3.append("💾 74% ");
+    item3
+        .append("Disk Space: ")
+        .yellow()
+        .bold()
+        .append("💾 74% ");
 
     let mut item4 = TextBuilder::new();
-    item4.append("Network:    ");
-    item4.push_style(
-        Style::default()
-            .with_foreground(Color::Green)
-            .with_effect(Effect::Bold),
-    );
-    item4.append("📶 Up ");
+    item4.append("Network:    ").green().bold().append("📶 Up ");
 
     let stats_list = List::fixed(vec![
         Paragraph::left(item1.as_ref().to_string()),
@@ -129,20 +114,13 @@ fn main() {
         let mut status_builder = TextBuilder::new();
         match row[3] {
             "Running" => {
-                status_builder.push_style(Style::default().with_foreground(Color::Green));
-                status_builder.append("● Running");
+                status_builder.green().append("● Running");
             }
             "Idle" => {
-                status_builder.push_style(Style::default().with_foreground(Color::Yellow));
-                status_builder.append("○ Idle");
+                status_builder.yellow().append("○ Idle");
             }
             _ => {
-                status_builder.push_style(
-                    Style::default()
-                        .with_foreground(Color::White)
-                        .with_effect(Effect::Dim),
-                );
-                status_builder.append("◌ Finished");
+                status_builder.white().dim().append("◌ Finished");
             }
         }
         let status = Lines::left(status_builder.as_ref().to_string());
@@ -167,32 +145,25 @@ fn main() {
 
     // 5. Build a styled Footer with hotkey hints
     let mut footer_builder = TextBuilder::new();
-    footer_builder.push_style(
-        Style::default()
-            .with_foreground(Color::Cyan)
-            .with_effect(Effect::Bold),
-    );
-    footer_builder.append(" [Q] ");
-    footer_builder.pop_last_style();
-    footer_builder.append("Quit   ");
-
-    footer_builder.push_style(
-        Style::default()
-            .with_foreground(Color::Cyan)
-            .with_effect(Effect::Bold),
-    );
-    footer_builder.append(" [R] ");
-    footer_builder.pop_last_style();
-    footer_builder.append("Refresh   ");
-
-    footer_builder.push_style(
-        Style::default()
-            .with_foreground(Color::Cyan)
-            .with_effect(Effect::Bold),
-    );
-    footer_builder.append(" [S] ");
-    footer_builder.pop_last_style();
-    footer_builder.append("Settings   ");
+    footer_builder
+        .cyan()
+        .bold()
+        .append(" [Q] ")
+        .pop_style()
+        .pop_style()
+        .append("Quit   ")
+        .cyan()
+        .bold()
+        .append(" [R] ")
+        .pop_style()
+        .pop_style()
+        .append("Refresh   ")
+        .cyan()
+        .bold()
+        .append(" [S] ")
+        .pop_style()
+        .pop_style()
+        .append("Settings   ");
 
     let footer_text = Lines::left(footer_builder.as_ref().to_string());
     let footer_separator = Filler::horizontal("─");

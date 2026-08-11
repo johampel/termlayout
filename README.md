@@ -23,7 +23,7 @@ Add `termlayout` to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-termlayout = "0.1.0"
+termlayout = "0.2.0"
 ```
 
 Or use `cargo add`:
@@ -40,7 +40,7 @@ To enable the `markdown` feature, add it to your dependencies:
 
 ```toml
 [dependencies]
-termlayout = { version = "0.1.0", features = ["markdown"] }
+termlayout = { version = "0.2.0", features = ["markdown"] }
 ```
 
 ## Features
@@ -52,7 +52,11 @@ termlayout = { version = "0.1.0", features = ["markdown"] }
 - **`Table`**: Flexible tables with headers, borders, and configurable column widths
 - **`Horizontal`/`Vertical`**: Stack layouts horizontally or vertically
 - **`Cell`**: Container with padding, clipping, and splitting capabilities
+- **`Frame`**: Box and title decorations around arbitrary nested content
 - **`Filler`**: Pattern-based area filling (horizontal, vertical, or both)
+- **`List`**: Ordered/unordered style lists with configurable markers
+- **`Menu`**: Key-based menu widget for interactive terminal navigation
+- **`Tree`**: Hierarchical tree rendering with multiple decoration styles
 - **`Markdown`**: Render Markdown documents (requires `markdown` feature)
 
 ### Styling System
@@ -125,20 +129,21 @@ fn main() {
 ### Styled Text
 
 ```rust
-use termlayout::ext::{Style, TextBuilder, Color, Effect};
+use termlayout::ext::TextBuilder;
 
 fn main() {
     let mut builder = TextBuilder::new();
-    
-    builder.push_str("Normal text ");
-    builder.push_style(Style::default().with_foreground(Color::Red));
-    builder.push_str("red text ");
-    builder.pop_style();
-    builder.push_style(Style::default().with_effect(Effect::Bold));
-    builder.push_str("bold text");
-    builder.pop_style();
-    
-    println!("{}", builder.build());
+
+    builder
+        .append("Normal text ")
+        .red()
+        .append("red text ")
+        .pop_style()
+        .bold()
+        .append("bold text")
+        .pop_style();
+
+    println!("{}", builder.as_ref());
 }
 ```
 

@@ -50,7 +50,7 @@ impl LayoutBuffer {
     {
         self.text.push_style_change(style_change);
         self.text.append(text);
-        self.text.pop_last_style();
+        self.text.pop_style();
     }
 
     pub(crate) fn append_text<T>(&mut self, text: T)
@@ -68,7 +68,7 @@ impl LayoutBuffer {
     }
 
     pub(crate) fn pop_style(&mut self) {
-        self.text.pop_last_style();
+        self.text.pop_style();
     }
 
     pub(crate) fn flush_text<T>(&mut self, partial: bool, layout_producer: T)
