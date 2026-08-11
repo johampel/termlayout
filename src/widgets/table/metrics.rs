@@ -117,6 +117,9 @@ impl<'a> TableMetrics<'a> {
     }
 
     fn measure_widths(&mut self, mode: MeasureMode) {
+        if mode.is_empty() {
+            return;
+        }
         // 1. Step: Compute the widths of each column if width != Fill
         let mut fill_count = 0;
         let mut fixed_width = 0;
@@ -187,6 +190,9 @@ impl<'a> TableMetrics<'a> {
     }
 
     fn measure_cell_contents_and_heights(&mut self, mode: MeasureMode) {
+        if mode.is_empty() {
+            return;
+        }
         for row in 0..self.table.rows {
             let mut height = 0;
             for col in 0..self.table.cols {

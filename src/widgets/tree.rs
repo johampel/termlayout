@@ -156,10 +156,10 @@ impl Layout for Tree {
                 };
                 let mut measurements = path.node.item.measure(item_mode);
                 if let Some(h) = height {
-                    if path.last_of_all() {
+                    if path.last_of_all() || measurements.dim.height > h {
                         measurements.dim.height = h;
                     }
-                    height = Some(h - measurements.dim.height);
+                    height = Some(h.saturating_sub(measurements.dim.height));
                 }
                 let node_dim = Dimension::new(
                     measurements.dim.width + prefix_width,
@@ -283,7 +283,7 @@ impl TreeNode {
     ///   node.
     /// - `callback`: A closure or function that takes a reference to a [`TreePath`] and performs
     ///   an operation on it. This closure must implement the `FnMut` trait, allowing it to have
-    ///   mutable state. It shoulr return `true`, if traversing can go on, or `false`, if it should
+    ///   mutable state. It should return `true`, if traversing can go on, or `false`, if it should
     ///   be stopped.
     ///
     /// # Returns

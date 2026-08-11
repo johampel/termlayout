@@ -154,7 +154,7 @@ impl Menu {
                     FormattedMenuItem::new(
                         context.options.with_normalized_horizontal_clip(),
                         LayoutWithContext::of(marker, marker_context).into(),
-                        item.text.layout_strict(item_context.options),
+                        LayoutWithContext::of(item.text.clone(), item_context).into(),
                     )
                     .into(),
                 )

@@ -611,7 +611,10 @@ impl Layout for Cell {
             return Measurements::empty()
                 .with_specifics(MeasurementSpecifics::Child(Measurements::empty().into()));
         }
-        self.dim.measure(&self.content, mode)
+        self.dim.measure(
+            &self.content,
+            mode.with_wrap_mode(self.effective_wrap_mode(mode.wrap_mode())),
+        )
     }
 
     fn layout_with_context(&'_ self, context: LayoutContext) -> BoxedFormattedLayout<'_> {

@@ -101,10 +101,11 @@ impl Layout for Frame {
                 wrap_mode,
             }),
         };
-        Measurements::new(
-            Dimension::new(inner.dim.width + hmargin, inner.dim.height + vmargin),
-            MeasurementSpecifics::Child(inner.into()),
-        )
+        let dim = mode.coerce_dim(Dimension::new(
+            inner.dim.width + hmargin,
+            inner.dim.height + vmargin,
+        ));
+        Measurements::new(dim, MeasurementSpecifics::Child(inner.into()))
     }
 
     fn layout_with_context(&'_ self, context: LayoutContext) -> BoxedFormattedLayout<'_> {

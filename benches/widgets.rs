@@ -289,7 +289,7 @@ fn bench_tree(c: &mut Criterion) {
     let mut g = c.benchmark_group("tree");
 
     let shallow = make_tree(1, 4); // 1 root + 4 leaves
-    let deep = make_tree(3, 3);    // 1 + 3 + 9 + 27 = 40 nodes
+    let deep = make_tree(3, 3); // 1 + 3 + 9 + 27 = 40 nodes
 
     g.bench_function("measure/shallow", |b| {
         b.iter(|| black_box(shallow.measure(MeasureMode::pref_width(80, WrapMode::Wrap))));

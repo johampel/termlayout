@@ -2,7 +2,7 @@ use crate::ext::DisplayStr;
 use crate::widgets::horizontal::row::Row;
 use crate::widgets::{Cell, CellAnchor, Filler};
 use crate::{Dimension, Layout, MeasureMode, MeasurementSpecifics, Measurements, WrapMode};
-use std::cmp::{max, min};
+use std::cmp::min;
 
 /// Precomputed layout metrics for a [`crate::widgets::Horizontal`] widget.
 ///
@@ -220,9 +220,9 @@ impl HorizontalMetrics {
             };
             for (index, cell) in cells.iter().enumerate() {
                 if cell.dim.is_fill() {
-                    let w = max(1, fill_width / fill_count);
+                    let w = fill_width.checked_div(fill_count).map_or(1, |w| w.max(1));
                     let measurements = cell.measure(MeasureMode::fixed_width(w, mode.wrap_mode()));
-                    fill_width -= measurements.dim.width;
+                    fill_width = fill_width.saturating_sub(measurements.dim.width);
                     fill_count -= 1;
                     result[index] = measurements;
                 }

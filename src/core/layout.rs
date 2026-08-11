@@ -5,8 +5,8 @@ use std::rc::Rc;
 
 /// Central trait that describes how to lay out textual content.
 ///
-/// The `Layout` trait provides two of methods:
-/// - The [`measure`](Layout::measure) methid that calculates the [`Measurements`] of a `Layout`.
+/// The `Layout` trait provides two method groups:
+/// - The [`measure`](Layout::measure) method that calculates the [`Measurements`] of a `Layout`.
 ///   The `Measurements` give information about the sizing of the layout.
 /// - Methods that actually lay out the content. The most central one is
 ///   [`layout_strict`](Layout::layout_strict); all other `layout*` methods are convenience

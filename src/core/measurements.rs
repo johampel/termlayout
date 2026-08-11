@@ -161,6 +161,35 @@ impl MeasureMode {
         }
     }
 
+    /// Sets the wrap mode for this size constraint.
+    ///
+    /// Returns a new `Self` instance that is identical to the current one,
+    /// but with its `wrap_mode` property updated to the provided value.
+    ///
+    /// Variants that do not have an associated wrap mode (e.g., `Self::Min`)
+    /// are returned unchanged.
+    ///
+    /// # Parameters
+    /// - `wrap_mode`: The new `WrapMode` to apply.
+    ///
+    /// # Returns
+    /// A new `Self` instance with the updated wrap mode.
+    #[must_use]
+    pub fn with_wrap_mode(self, wrap_mode: WrapMode) -> Self {
+        match self {
+            Self::Min => Self::Min,
+            Self::PrefWidth { max_width, .. } => Self::PrefWidth {
+                max_width,
+                wrap_mode,
+            },
+            Self::FixedWidth { width, .. } => Self::FixedWidth { width, wrap_mode },
+            Self::Exact { dimension, .. } => Self::Exact {
+                dimension,
+                wrap_mode,
+            },
+        }
+    }
+
     /// Returns, if defined, the (maximum) width.
     /// There is a width for all variants except `Min`.
     ///

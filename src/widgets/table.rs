@@ -71,6 +71,9 @@ impl Table {
 
 impl Layout for Table {
     fn measure(&self, mode: MeasureMode) -> Measurements {
+        if mode.is_empty() {
+            return Measurements::empty().with_specifics(MeasurementSpecifics::Rows(vec![]));
+        }
         let table = DecoratedTable::new(self);
         let metrics = TableMetrics::new(&table, mode);
         let rows = metrics.all_rows(mode);
@@ -561,10 +564,7 @@ mod tests {
         // col0="abc" fills 3 chars; col1="x" fills 1 char and is padded to 6 (fill col).
         let table = headless_table(
             vec![CellWidth::Minimal, CellWidth::Fill],
-            vec![
-                Lines::left("abc").into(),
-                Lines::left("x").into(),
-            ],
+            vec![Lines::left("abc").into(), Lines::left("x").into()],
         );
         let result = format!(
             "{}",
@@ -588,10 +588,7 @@ mod tests {
     fn fill_two_cols_split_evenly() {
         let table = headless_table(
             vec![CellWidth::Fill, CellWidth::Fill],
-            vec![
-                Lines::left("A").into(),
-                Lines::left("B").into(),
-            ],
+            vec![Lines::left("A").into(), Lines::left("B").into()],
         );
         let result = format!(
             "{}",
@@ -615,10 +612,7 @@ mod tests {
     fn fill_two_cols_odd_remainder_last_col_gets_more() {
         let table = headless_table(
             vec![CellWidth::Fill, CellWidth::Fill],
-            vec![
-                Lines::left("A").into(),
-                Lines::left("B").into(),
-            ],
+            vec![Lines::left("A").into(), Lines::left("B").into()],
         );
         let result = format!(
             "{}",
@@ -677,13 +671,12 @@ mod tests {
         // The subsequent update fill_width = 0 - 1 previously caused an underflow panic.
         let table = headless_table(
             vec![CellWidth::Minimal, CellWidth::Fill],
-            vec![
-                Lines::left(&"a".repeat(30)).into(),
-                Lines::left("x").into(),
-            ],
+            vec![Lines::left(&"a".repeat(30)).into(), Lines::left("x").into()],
         );
         // Must not panic. The Fill column is assigned the minimum width of 1.
-        let dim = table.measure(MeasureMode::fixed_width(20, WrapMode::default_truncate())).dim;
+        let dim = table
+            .measure(MeasureMode::fixed_width(20, WrapMode::default_truncate()))
+            .dim;
         assert!(dim.height > 0);
         assert!(dim.width > 0);
     }
@@ -696,10 +689,7 @@ mod tests {
         // Expected dim: width = 3 + 1(sep) + 3 = 7, height = 1.
         let table = headless_table(
             vec![CellWidth::Minimal, CellWidth::Fill],
-            vec![
-                Lines::left("abc").into(),
-                Lines::left("xyz").into(),
-            ],
+            vec![Lines::left("abc").into(), Lines::left("xyz").into()],
         );
         let dim = table.measure(MeasureMode::Min).dim;
         assert_eq!(dim.width, 7);
@@ -719,10 +709,7 @@ mod tests {
         // col0 = floor(20 * 0.5) = 10.  Natural total width = 10 + 1 + 3 = 14.
         let table = headless_table(
             vec![CellWidth::Proportional(0.5), CellWidth::Minimal],
-            vec![
-                Lines::left("x").into(),
-                Lines::left("abc").into(),
-            ],
+            vec![Lines::left("x").into(), Lines::left("abc").into()],
         );
         let dim = table
             .measure(MeasureMode::fixed_width(20, WrapMode::default_truncate()))
@@ -755,10 +742,7 @@ mod tests {
         // col1: Minimal, content "xy" → width 2.  Total = 8 + 1 + 2 = 11.
         let table = headless_table(
             vec![CellWidth::Fixed(8), CellWidth::Minimal],
-            vec![
-                Lines::left("abc").into(),
-                Lines::left("xy").into(),
-            ],
+            vec![Lines::left("abc").into(), Lines::left("xy").into()],
         );
         let dim = table.measure(MeasureMode::Min).dim;
         assert_eq!(dim.width, 11);
