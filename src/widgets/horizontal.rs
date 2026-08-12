@@ -1,13 +1,13 @@
 use crate::widgets::Cell;
 use crate::widgets::horizontal::row::Row;
-use crate::widgets::vertical::FormattedVertical;
 use crate::{
-    BoxedFormattedLayout, Dimension, Layout, LayoutOptions, RcLayout, Rect, WrapMode, rc_layout,
+    BoxedFormattedLayout, Layout, LayoutContext, MeasureMode, MeasurementSpecifics, Measurements,
+    RcLayout, rc_layout,
 };
 use std::any::Any;
 use std::borrow::Cow;
-use std::cmp::max;
 
+pub(crate) mod metrics;
 pub(crate) mod row;
 
 /// A widget that arranges cells horizontally in a row.
@@ -73,87 +73,6 @@ impl Horizontal {
         }
         Cow::Borrowed(&self.content)
     }
-
-    /// Computes the concrete dimensions of each [`Cell`] in the horizontal layout.
-    /// The dimensions are computed in two steps:
-    ///
-    /// In a first step, for all `Cells` not having a declarative [`CellWidth`] set to `Fill`
-    /// (so `cell.dim != CellDimension::Declarative(CellWidth::Fill)`): For these, the cell width
-    /// can be computed directly based on the `max_width` parameter or the cell itself, without
-    /// the need to take other cell dimensions into account. If `max_width` is `None` and the size
-    /// of the cell depends on the `max_width` (such as a `CellWidth::Propertional(f64)`), then
-    /// the minimum dimension is used.
-    ///
-    /// In a second step, the size of the "fill" cells is computed. This is done by taking the
-    /// `max_width` and the size of the already computed cell sizes into account. "fill" columns
-    /// are sized so that the remaining space not covered by the other cells is distributed equally
-    /// among the "fill" cells. If the `max_width` is `None`, then the minimum dimension is used.
-    /// If the other cells already require more space than `max_width`, then the "fill" cells are
-    /// sized so that the next multiple of `max_width` is reached.
-    ///
-    /// # Parameters
-    /// - `cells`: The list of [`Cell`]s to compute the sizes for
-    /// - `max_width`: The maximum width available for the cells, or `None` if no maximum is specified
-    /// - `wrap_mode`: The default [`WrapMode`] to use for cells that do not specify their own
-    ///
-    /// # Returns
-    /// An [`Vec<(Dimension, Dimension)>`] containing the computed dimensions for each cell, the
-    /// first dimension is the cell dimension, the second dimension is the content dimension.
-    #[must_use]
-    pub(crate) fn compute_fixed_dims(
-        cells: &[Cell],
-        max_width: Option<usize>,
-        wrap_mode: WrapMode,
-    ) -> Vec<(Dimension, Dimension)> {
-        // 1. Step: Compute the preferred dimensions of each cell, if width != Fill
-        let mut result: Vec<(Dimension, Dimension)> = Vec::with_capacity(cells.len());
-        let mut fill_count = 0;
-        let mut fixed_width = 0;
-        for cell in cells {
-            let dims = if cell.dim.is_fill() && max_width.is_some() {
-                fill_count += 1;
-                (Dimension::empty(), Dimension::empty())
-            } else {
-                cell.calculate_dims(max_width, wrap_mode)
-            };
-            fixed_width += dims.0.width;
-            result.push(dims);
-        }
-
-        // 2. Step: Compute the dimensions of those cells with width == Fill
-        if fill_count > 0
-            && let Some(max_width) = max_width
-        {
-            let mut fill_width = if fixed_width + fill_count > max_width {
-                max_width - fixed_width % max_width
-            } else {
-                max_width - fixed_width
-            };
-            for (index, cell) in cells.iter().enumerate() {
-                if cell.dim.is_fill() {
-                    let w = max(1, fill_width / fill_count);
-                    let dims = cell.calculate_dims(Some(w), wrap_mode);
-                    fill_width -= dims.0.width;
-                    fill_count -= 1;
-                    result[index] = dims;
-                }
-            }
-        }
-        result
-    }
-
-    fn apply_fixed_dims(
-        cells: &[Cell],
-        max_width: Option<usize>,
-        wrap_mode: WrapMode,
-    ) -> Vec<Cell> {
-        let dims = Self::compute_fixed_dims(cells, max_width, wrap_mode);
-        cells
-            .iter()
-            .zip(dims.iter())
-            .map(|(cell, dim)| cell.clone().with_dims(dim.0, dim.1))
-            .collect()
-    }
 }
 
 impl<T> From<T> for Horizontal
@@ -166,53 +85,16 @@ where
 }
 
 impl Layout for Horizontal {
-    fn pref_dim(&self, max_width: usize, wrap_mode: WrapMode) -> Dimension {
-        if self.content.is_empty() || max_width == 0 {
-            return Dimension::empty();
-        }
-
-        let cells = self.cells();
-        let rows = Row::from_cells(
-            Self::apply_fixed_dims(&cells, Some(max_width), wrap_mode),
-            max_width,
-            wrap_mode,
-        );
-        rows.iter()
-            .fold(Dimension::empty(), |acc, row| acc.vertical_union(row.dim))
+    fn measure(&self, mode: MeasureMode) -> Measurements {
+        let metrics = metrics::HorizontalMetrics::from_cells(self.cells().as_ref(), mode);
+        Measurements::new(metrics.dim, MeasurementSpecifics::Rows(metrics.rows))
     }
 
-    fn min_dim(&self) -> Dimension {
-        if self.content.is_empty() {
-            return Dimension::empty();
+    fn layout_with_context(&'_ self, context: LayoutContext) -> BoxedFormattedLayout<'_> {
+        match &context.measurements.specifics {
+            MeasurementSpecifics::Rows(_) => Row::layout(context).unwrap(),
+            _ => self.layout_strict(context.options),
         }
-        let cells = self.cells();
-        Self::compute_fixed_dims(cells.as_ref(), None, WrapMode::default())
-            .iter()
-            .fold(Dimension::empty(), |acc, dim| acc.horizontal_union(dim.0))
-    }
-
-    fn layout_strict(&'_ self, options: LayoutOptions) -> BoxedFormattedLayout<'_> {
-        let cells = self.cells();
-        let rows = Row::from_cells(
-            Self::apply_fixed_dims(&cells, Some(options.dim.width), options.wrap_mode),
-            options.dim.width,
-            options.wrap_mode,
-        );
-
-        if rows.len() == 1 {
-            return rows[0].layout(options);
-        }
-
-        let mut offset = 0;
-        let formatted = rows
-            .into_iter()
-            .map(|row| {
-                let row_options = options.intersect(Rect::new(0, offset, row.dim), false);
-                offset += row.dim.height;
-                row.layout(row_options)
-            })
-            .collect();
-        FormattedVertical::new(formatted, options.with_normalized_clip()).into()
     }
 
     fn as_any(&self) -> &dyn Any {
@@ -226,7 +108,7 @@ rc_layout!(Horizontal);
 mod tests {
     use crate::widgets::horizontal::Horizontal;
     use crate::widgets::{Cell, CellAnchor, CellDimension, CellWidth, Filler, Lines};
-    use crate::{Dimension, Layout, LayoutOptions, Rect, WrapMode};
+    use crate::{Dimension, Layout, LayoutOptions, MeasureMode, Rect, WrapMode};
 
     fn sample_cells() -> Vec<Cell> {
         vec![
@@ -240,48 +122,51 @@ mod tests {
     }
 
     #[test]
-    fn horizontal_min_dim() {
+    fn horizontal_measure_min() {
+        let mode = MeasureMode::min();
+
         // No spacer
         let horizontal = Horizontal::new(sample_cells(), None);
-        assert_eq!(horizontal.min_dim(), Dimension::new(14, 5));
+        let measurement = horizontal.measure(mode);
+
+        assert_eq!(measurement.dim, Dimension::new(14, 5));
+        assert_eq!(measurement.specifics.rows().unwrap().len(), 1);
 
         // With spacer
         let horizontal = Horizontal::new(sample_cells(), Some(Filler::once(" foo ").into()));
-        assert_eq!(horizontal.min_dim(), Dimension::new(24, 5));
+        let measurement = horizontal.measure(mode);
+
+        assert_eq!(measurement.dim, Dimension::new(24, 5));
+        assert_eq!(measurement.specifics.rows().unwrap().len(), 1);
     }
 
     #[test]
-    fn horizontal_pref_dim() {
+    fn horizontal_measure_pref_width() {
         // No spacer
         let horizontal = Horizontal::new(sample_cells(), None);
-        assert_eq!(
-            horizontal.pref_dim(20, WrapMode::Wrap),
-            Dimension::new(14, 5)
-        );
-        assert_eq!(
-            horizontal.pref_dim(10, WrapMode::Wrap),
-            Dimension::new(10, 10)
-        );
-        assert_eq!(
-            horizontal.pref_dim(10, WrapMode::default_truncate()),
-            Dimension::new(10, 4)
-        );
+
+        let mode = MeasureMode::pref_width(20, WrapMode::Wrap);
+        let measurement = horizontal.measure(mode);
+        assert_eq!(measurement.dim, Dimension::new(14, 5));
+        assert_eq!(measurement.specifics.rows().unwrap().len(), 1);
+
+        let mode = MeasureMode::pref_width(10, WrapMode::Wrap);
+        let measurement = horizontal.measure(mode);
+        assert_eq!(measurement.dim, Dimension::new(10, 10));
+        assert_eq!(measurement.specifics.rows().unwrap().len(), 2);
 
         // With spacer
         let horizontal = Horizontal::new(sample_cells(), Some(Filler::once(" foo ").into()));
-        assert_eq!(horizontal.min_dim(), Dimension::new(24, 5));
-        assert_eq!(
-            horizontal.pref_dim(20, WrapMode::Wrap),
-            Dimension::new(20, 10)
-        );
-        assert_eq!(
-            horizontal.pref_dim(10, WrapMode::Wrap),
-            Dimension::new(10, 14)
-        );
-        assert_eq!(
-            horizontal.pref_dim(10, WrapMode::default_truncate()),
-            Dimension::new(10, 4)
-        );
+
+        let mode = MeasureMode::pref_width(20, WrapMode::Wrap);
+        let measurement = horizontal.measure(mode);
+        assert_eq!(measurement.dim, Dimension::new(20, 10));
+        assert_eq!(measurement.specifics.rows().unwrap().len(), 2);
+
+        let mode = MeasureMode::pref_width(10, WrapMode::Wrap);
+        let measurement = horizontal.measure(mode);
+        assert_eq!(measurement.dim, Dimension::new(10, 14));
+        assert_eq!(measurement.specifics.rows().unwrap().len(), 3);
     }
 
     #[test]
@@ -299,12 +184,12 @@ mod tests {
         assert_eq!(
             format!("{}", horizontal.layout_strict(options)),
             concat!(
-                "             |              |                          ABCDE\n",
-                "   abcdef    | 123          |                          FGHIJ\n",
-                "   ghijkl    | 456          |                          KLMNO\n",
-                "   mnopqr    | 789          |                          PQRST\n",
-                "   stuvwx    |              |                          UVWXY\n",
-                "                              \n"
+                "       |              |                                ABCDE\n",
+                "abcdef | 123          |                                FGHIJ\n",
+                "ghijkl | 456          |                                KLMNO\n",
+                "mnopqr | 789          |                                PQRST\n",
+                "stuvwx |              |                                UVWXY\n",
+                "       |              | \n"
             )
         );
     }
@@ -322,7 +207,7 @@ mod tests {
                 "mnopqr | 456 | KLMNO\n",
                 "stuvwx | 789 | PQRST\n",
                 "       |     | UVWXY\n",
-                "               \n"
+                "       |     | \n"
             )
         );
 
@@ -335,7 +220,7 @@ mod tests {
                 "mnopqr | 456 | KLMNO     \n",
                 "stuvwx | 789 | PQRST     \n",
                 "       |     | UVWXY     \n",
-                "                         \n"
+                "       |     |           \n"
             )
         );
     }
@@ -356,7 +241,7 @@ mod tests {
                 "nopqr | 456 | K\n",
                 "tuvwx | 789 | P\n",
                 "      |     | U\n",
-                "              \n"
+                "      |     | \n"
             )
         );
 
@@ -372,7 +257,7 @@ mod tests {
                 "nopqr | 456 | K\n",
                 "tuvwx | 789 | P\n",
                 "      |     | U\n",
-                "               \n"
+                "      |     |  \n"
             )
         );
     }
@@ -395,7 +280,7 @@ mod tests {
                 "mnopqr | 456 | KL…\n", //
                 "stuvwx | 789 | PQ…\n", //
                 "       |     | UV…\n", //
-                "                 \n"   //
+                "       |     |   …\n"  //
             )
         );
 
@@ -413,7 +298,7 @@ mod tests {
                 "mnopqr | 456 | KL…\n", //
                 "stuvwx | 789 | PQ…\n", //
                 "       |     | UV…\n", //
-                "                  \n"  //
+                "       |     |   …\n"  //
             )
         );
     }
@@ -434,7 +319,7 @@ mod tests {
                 "nopqr | 456 | K\n", //
                 "tuvwx | 789 | P\n", //
                 "      |     | U\n", //
-                "               \n"  //
+                "      |     |  \n"  //
             )
         );
 
@@ -450,7 +335,7 @@ mod tests {
                 "nopqr | 456 | K\n", //
                 "tuvwx | 789 | P\n", //
                 "      |     | U\n", //
-                "               \n"  //
+                "      |     |  \n"  //
             )
         );
     }
@@ -472,7 +357,7 @@ mod tests {
                 " KLMNO\n",
                 " PQRST\n",
                 " UVWXY\n",
-                "\n"
+                " \n"
             )
         );
 

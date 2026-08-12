@@ -6,7 +6,7 @@
 //! cargo run --example newspaper
 //! ```
 
-use termlayout::ext::{Color, Effect, Style, TextBuilder};
+use termlayout::ext::TextBuilder;
 use termlayout::widgets::{
     Cell, CellWidth, Filler, Frame, FrameDecoration, Horizontal, Lines, Paragraph, Vertical,
 };
@@ -25,14 +25,10 @@ fn main() {
 
     // 2. Subtitle with Date and Edition (using a split-column look)
     let mut date_builder = TextBuilder::new();
-    date_builder.push_style(Style::default().with_effect(Effect::Bold));
-    date_builder.append("Edition #42");
-    date_builder.pop_last_style();
+    date_builder.bold().append("Edition #42").pop_style();
 
     let mut price_builder = TextBuilder::new();
-    price_builder.push_style(Style::default().with_foreground(Color::Green));
-    price_builder.append("Price: FREE");
-    price_builder.pop_last_style();
+    price_builder.green().append("Price: FREE").pop_style();
 
     let metadata_row = Horizontal::new(
         vec![
@@ -78,14 +74,13 @@ fn main() {
 
     // 4. A footer banner with some styled call-to-action
     let mut footer_builder = TextBuilder::new();
-    footer_builder.push_style(
-        Style::default()
-            .with_foreground(Color::Magenta)
-            .with_effect(Effect::Inverse),
-    );
-    footer_builder.append(" READ ALL ABOUT IT! ");
-    footer_builder.pop_last_style();
-    footer_builder.append(" Powered by termlayout crate. Declarative formatting made easy.");
+    footer_builder
+        .magenta()
+        .inverse()
+        .append(" READ ALL ABOUT IT! ")
+        .pop_style()
+        .pop_style()
+        .append(" Powered by termlayout crate. Declarative formatting made easy.");
     let footer = Lines::center(footer_builder.as_ref().to_string());
 
     // 5. Combine everything vertically

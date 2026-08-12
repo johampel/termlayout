@@ -25,13 +25,17 @@ pub mod ext;
 pub mod widgets;
 
 // Reexports
+pub use core::context::LayoutContext;
+pub use core::context::LayoutOptions;
+pub use core::context::WrapMode;
 pub use core::geometry::Dimension;
 pub use core::geometry::Rect;
 pub use core::layout::BoxedFormattedLayout;
 pub use core::layout::Layout;
 pub use core::layout::RcLayout;
-pub use core::options::LayoutOptions;
-pub use core::options::WrapMode;
+pub use core::measurements::MeasureMode;
+pub use core::measurements::MeasurementSpecifics;
+pub use core::measurements::Measurements;
 
 #[cfg(feature = "markdown")]
 pub use widgets::FrameConfig;

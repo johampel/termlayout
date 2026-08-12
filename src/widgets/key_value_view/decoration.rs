@@ -26,11 +26,11 @@ impl Default for KeyValueViewDecoration {
         Self::new(
             TextBuilder::new()
                 .with_bold()
-                .with_color(Color::Custom8(33))
+                .with_foreground_color(Color::Custom8(33))
                 .with_text("Key"),
             TextBuilder::new()
                 .with_bold()
-                .with_color(Color::Custom8(33))
+                .with_foreground_color(Color::Custom8(33))
                 .with_text("Value"),
             TableDecoration::from_spec(concat!(
                 "┌─┬─┐\n", //

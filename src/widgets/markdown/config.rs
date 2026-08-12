@@ -107,13 +107,13 @@ impl<'a> MarkdownConfig<'a> {
                         .with_text("  ")
                         .with_style((styles.quote_with_marker_background_style)(Style::default()))
                         .with_text("💡 \n")
-                        .without_last_style()
+                        .without_style()
                         .with_text("  ")
                         .with_style((styles.quote_with_marker_background_style)(
                             Style::default().with_foreground(Color::Green),
                         ))
                         .with_text("▌ ")
-                        .without_last_style()
+                        .without_style()
                         .with_text("C ")
                         .into(),
                 ),
@@ -125,13 +125,13 @@ impl<'a> MarkdownConfig<'a> {
                         .with_text("  ")
                         .with_style((styles.quote_with_marker_background_style)(Style::default()))
                         .with_text("✨ \n")
-                        .without_last_style()
+                        .without_style()
                         .with_text("  ")
                         .with_style((styles.quote_with_marker_background_style)(
                             Style::default().with_foreground(Color::Green),
                         ))
                         .with_text("▌ ")
-                        .without_last_style()
+                        .without_style()
                         .with_text("C ")
                         .into(),
                 ),
@@ -143,13 +143,13 @@ impl<'a> MarkdownConfig<'a> {
                         .with_text("  ")
                         .with_style((styles.quote_with_marker_background_style)(Style::default()))
                         .with_text("ℹ️ \n")
-                        .without_last_style()
+                        .without_style()
                         .with_text("  ")
                         .with_style((styles.quote_with_marker_background_style)(
                             Style::default().with_foreground(Color::Cyan),
                         ))
                         .with_text("▌ ")
-                        .without_last_style()
+                        .without_style()
                         .with_text("C ")
                         .into(),
                 ),
@@ -161,13 +161,13 @@ impl<'a> MarkdownConfig<'a> {
                         .with_text("  ")
                         .with_style((styles.quote_with_marker_background_style)(Style::default()))
                         .with_text("⚠️ \n")
-                        .without_last_style()
+                        .without_style()
                         .with_text("  ")
                         .with_style((styles.quote_with_marker_background_style)(
                             Style::default().with_foreground(Color::Magenta),
                         ))
                         .with_text("▌ ")
-                        .without_last_style()
+                        .without_style()
                         .with_text("C ")
                         .into(),
                 ),
@@ -179,13 +179,13 @@ impl<'a> MarkdownConfig<'a> {
                         .with_text("  ")
                         .with_style((styles.quote_with_marker_background_style)(Style::default()))
                         .with_text("🛑 \n")
-                        .without_last_style()
+                        .without_style()
                         .with_text("  ")
                         .with_style((styles.quote_with_marker_background_style)(
                             Style::default().with_foreground(Color::Red),
                         ))
                         .with_text("▌ ")
-                        .without_last_style()
+                        .without_style()
                         .with_text("C ")
                         .into(),
                 ),

@@ -1,13 +1,13 @@
 use crate::ext::{
-    BaseLayoutWriter, BoxedLayoutWriter, DisplayStr, FormattedLayout, LayoutWithOptions,
+    BaseLayoutWriter, BoxedLayoutWriter, DisplayStr, FormattedLayout, LayoutWithContext,
     LayoutWriter, SizedLayoutResult,
 };
 use crate::widgets::lines::LinesTrimming;
 use crate::widgets::vertical::FormattedVertical;
 use crate::widgets::{Lines, LinesAlignment};
 use crate::{
-    BoxedFormattedLayout, Dimension, Layout, LayoutOptions, RcLayout, Rect, WrapMode,
-    box_formatted_layout, rc_layout,
+    BoxedFormattedLayout, Dimension, Layout, LayoutContext, LayoutOptions, MeasureMode,
+    MeasurementSpecifics, Measurements, RcLayout, box_formatted_layout, rc_layout,
 };
 use std::any::Any;
 use std::cmp::max;
@@ -214,6 +214,49 @@ impl List {
         .into()
     }
 
+    fn layout_item(
+        &self,
+        index: usize,
+        item: RcLayout,
+        context: LayoutContext,
+    ) -> Option<BoxedFormattedLayout<'static>> {
+        match context.measurements.specifics {
+            MeasurementSpecifics::Children(m) if m.len() == 2 => {
+                let mut marker_context =
+                    LayoutContext::new_with_intersection(&context.options, 0, 0, m[0].clone());
+                marker_context.options.fill_rows = true;
+                let item_context = LayoutContext::new_with_intersection(
+                    &context.options,
+                    marker_context.options.dim.width,
+                    0,
+                    m[1].clone(),
+                );
+                let marker = self.create_marker(index);
+                Some(
+                    FormattedListItem::new(
+                        context.options.with_normalized_horizontal_clip(),
+                        LayoutWithContext::of(marker, marker_context).into(),
+                        LayoutWithContext::of(item, item_context).into(),
+                    )
+                    .into(),
+                )
+            }
+            _ => None,
+        }
+    }
+
+    fn measure_item(item: &RcLayout, marker_width: usize, mode: MeasureMode) -> Measurements {
+        let content_measurements = item.measure(mode);
+        let marker_measurements: Measurements =
+            Dimension::new(marker_width, content_measurements.dim.height).into();
+        Measurements::new(
+            content_measurements
+                .dim
+                .horizontal_union(marker_measurements.dim),
+            MeasurementSpecifics::Children(vec![marker_measurements, content_measurements]),
+        )
+    }
+
     fn calculate_widths(&self, max_width: usize) -> (usize, usize) {
         if max_width > 0 {
             let marker_width = self.marker.max_width(self.items.len());
@@ -226,54 +269,72 @@ impl List {
 }
 
 impl Layout for List {
-    fn pref_dim(&self, max_width: usize, wrap_mode: WrapMode) -> Dimension {
+    fn measure(&self, mode: MeasureMode) -> Measurements {
+        let mut height = mode.height();
+        let max_width = mode.coerce_width(usize::MAX);
         let (marker_width, item_width) = self.calculate_widths(max_width);
-        let mut dim = self.items.iter().fold(Dimension::empty(), |acc, item| {
-            acc.vertical_union(item.pref_dim(item_width, wrap_mode))
-        });
-        dim.width += marker_width;
-        dim
+        let mut children = Vec::with_capacity(self.items.len());
+        let mut dim = Dimension::empty();
+
+        for (index, item) in self.items.iter().enumerate() {
+            let item_mode = match mode {
+                MeasureMode::Min => MeasureMode::Min,
+                MeasureMode::PrefWidth { wrap_mode, .. } => {
+                    MeasureMode::pref_width(item_width, wrap_mode)
+                }
+                MeasureMode::FixedWidth { wrap_mode, .. }
+                | MeasureMode::Exact { wrap_mode, .. } => {
+                    MeasureMode::fixed_width(item_width, wrap_mode)
+                }
+            };
+            let mut item_measurements = Self::measure_item(item, marker_width, item_mode);
+            if let Some(h) = height {
+                if h < item_measurements.dim.height || index == self.items.len() - 1 {
+                    item_measurements.dim.height = h;
+                }
+                height = Some(h.saturating_sub(item_measurements.dim.height));
+            }
+            dim = dim.vertical_union(item_measurements.dim);
+            children.push(item_measurements);
+
+            if height == Some(0) {
+                break;
+            }
+        }
+
+        Measurements::new(dim, MeasurementSpecifics::Children(children))
     }
 
-    fn min_dim(&self) -> Dimension {
-        let mut dim = self.items.iter().fold(Dimension::empty(), |acc, item| {
-            acc.vertical_union(item.min_dim())
-        });
-        dim.width += self.marker.max_width(self.items.len());
-        dim
-    }
-
-    fn layout_strict(&'_ self, options: LayoutOptions) -> BoxedFormattedLayout<'_> {
-        let (marker_width, item_width) = self.calculate_widths(options.dim.width);
-        let mut row = 0;
-        let content = self
-            .items
-            .iter()
-            .enumerate()
-            .map(|(index, item)| {
-                let item_dim = item.pref_dim(item_width, options.wrap_mode);
-                let item_options = options.intersect(Rect::new(marker_width, row, item_dim), false);
-                let line_options = options
-                    .intersect(
-                        Rect::new(0, row, Dimension::new(options.dim.width, item_dim.height)),
-                        true,
-                    )
-                    .with_normalized_horizontal_clip();
-                let marker_options = options.intersect(
-                    Rect::new(0, row, Dimension::new(marker_width, item_dim.height)),
-                    true,
-                );
-                let marker = self.create_marker(index);
-                row += item_dim.height;
-                FormattedListItem::new(
-                    line_options,
-                    LayoutWithOptions::of(marker, marker_options).into(),
-                    item.layout_strict(item_options),
-                )
-                .into()
-            })
-            .collect();
-        FormattedVertical::new(content, options.with_normalized_horizontal_clip()).into()
+    fn layout_with_context(&'_ self, context: LayoutContext) -> BoxedFormattedLayout<'_> {
+        match context.measurements.specifics {
+            MeasurementSpecifics::Children(item_measurements) => {
+                let mut y = 0;
+                let mut children = Vec::with_capacity(item_measurements.len());
+                let mut ok = true;
+                for (index, (item, measurements)) in
+                    self.items.iter().zip(item_measurements.iter()).enumerate()
+                {
+                    let ctxt = LayoutContext::new_with_intersection(
+                        &context.options,
+                        0,
+                        y,
+                        measurements.clone(),
+                    );
+                    y += ctxt.options.dim.height;
+                    if let Some(layout) = self.layout_item(index, item.clone(), ctxt) {
+                        children.push(layout);
+                    } else {
+                        ok = false;
+                        break;
+                    }
+                }
+                if !ok {
+                    return self.layout_strict(context.options);
+                }
+                FormattedVertical::new(children, context.options).into()
+            }
+            _ => self.layout_strict(context.options),
+        }
     }
 
     fn as_any(&self) -> &dyn Any {
@@ -768,7 +829,7 @@ impl ListItemMakerParser {
 mod tests {
     use crate::widgets::list::ListItemMakerParser;
     use crate::widgets::{LinesAlignment, List, ListItemEnumerator, ListItemMarker, Paragraph};
-    use crate::{Dimension, Layout, LayoutOptions, Rect, WrapMode};
+    use crate::{Dimension, Layout, LayoutOptions, MeasureMode, Rect, WrapMode};
 
     fn sample_list() -> List {
         List::new(
@@ -787,33 +848,65 @@ mod tests {
         )
     }
     #[test]
-    fn list_min_dim() {
+    fn list_measure_min() {
         let list = sample_list();
-        let result = list.min_dim();
-        assert_eq!(result, Dimension::new(15, 64));
+
+        let result = list.measure(MeasureMode::Min);
+
+        assert_eq!(result.dim, Dimension::new(15, 64));
+        let children = result.specifics.children().unwrap();
+        assert_eq!(children.len(), 3);
+        assert_eq!(children[0].dim, Dimension::new(15, 19));
+        assert_eq!(children[1].dim, Dimension::new(15, 29));
+        assert_eq!(children[2].dim, Dimension::new(15, 16));
     }
 
     #[test]
-    fn list_pref_dim() {
+    fn list_measure_exact() {
         let list = sample_list();
 
-        let result = list.pref_dim(100, WrapMode::Wrap);
-        assert_eq!(result, Dimension::new(100, 7));
-        let result = list.pref_dim(50, WrapMode::Wrap);
-        assert_eq!(result, Dimension::new(50, 14));
-        let result = list.pref_dim(2, WrapMode::Wrap);
-        assert_eq!(result, Dimension::new(2, 447));
-        let result = list.pref_dim(1, WrapMode::Wrap);
-        assert_eq!(result, Dimension::new(1, 447));
-
-        let result = list.pref_dim(100, WrapMode::default_truncate());
-        assert_eq!(result, Dimension::new(100, 7));
-        let result = list.pref_dim(10, WrapMode::default_truncate());
-        assert_eq!(result, Dimension::new(10, 87));
+        let result = list.measure(MeasureMode::exact(Dimension::new(50, 40), WrapMode::Wrap));
+        assert_eq!(result.dim, Dimension::new(50, 40));
+        let children = result.specifics.children().unwrap();
+        assert_eq!(children.len(), 3);
+        assert_eq!(children[0].dim, Dimension::new(50, 4));
+        assert_eq!(children[1].dim, Dimension::new(50, 6));
+        assert_eq!(children[2].dim, Dimension::new(50, 30));
     }
 
     #[test]
-    fn list_layout() {
+    fn list_measure_pref_width() {
+        let list = sample_list();
+
+        let result = list.measure(MeasureMode::pref_width(100, WrapMode::Wrap));
+        assert_eq!(result.dim, Dimension::new(100, 7));
+        let children = result.specifics.children().unwrap();
+        assert_eq!(children.len(), 3);
+        assert_eq!(children[0].dim, Dimension::new(100, 2));
+        assert_eq!(children[1].dim, Dimension::new(99, 3));
+        assert_eq!(children[2].dim, Dimension::new(95, 2));
+
+        let result = list.measure(MeasureMode::pref_width(50, WrapMode::Wrap));
+        assert_eq!(result.dim, Dimension::new(50, 14));
+        let children = result.specifics.children().unwrap();
+        assert_eq!(children.len(), 3);
+        assert_eq!(children[0].dim, Dimension::new(46, 4));
+        assert_eq!(children[1].dim, Dimension::new(50, 6));
+        assert_eq!(children[2].dim, Dimension::new(48, 4));
+
+        let result = list.measure(MeasureMode::pref_width(2, WrapMode::Wrap));
+        assert_eq!(result.dim, Dimension::new(2, 447));
+        let result = list.measure(MeasureMode::pref_width(1, WrapMode::Wrap));
+        assert_eq!(result.dim, Dimension::new(1, 447));
+
+        let result = list.measure(MeasureMode::pref_width(100, WrapMode::default_truncate()));
+        assert_eq!(result.dim, Dimension::new(100, 7));
+        let result = list.measure(MeasureMode::pref_width(10, WrapMode::default_truncate()));
+        assert_eq!(result.dim, Dimension::new(10, 87));
+    }
+
+    #[test]
+    fn list_layout_no_clip() {
         let list = sample_list();
 
         // No clip, no fill
@@ -865,6 +958,33 @@ mod tests {
                 "                                                  \n"
             )
         );
+
+        // with clip, with fill
+        let options = LayoutOptions::new(
+            Dimension::new(50, 15),
+            true,
+            WrapMode::default(),
+            Some(Rect::new(2, 5, Dimension::new(30, 8))),
+        );
+        let layout = list.layout_strict(options);
+        let result = format!("{layout}");
+        assert_eq!(
+            result,
+            concat!(
+                "   sanctus est Lorem ipsum dol\n",
+                "   ipsum dolor sit amet, conse\n",
+                "   elitr, sed diam nonumy eirm\n",
+                "   ut labore et dolore magna a\n",
+                "   diam voluptua.             \n",
+                "i. At vero eos et accusam et j\n",
+                "   et ea rebum. Stet clita kas\n",
+                "   sea takimata sanctus est Lo\n",
+            )
+        );
+    }
+    #[test]
+    fn list_layout_with_clip() {
+        let list = sample_list();
 
         // with clip, with fill
         let options = LayoutOptions::new(

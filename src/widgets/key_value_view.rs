@@ -1,9 +1,9 @@
 pub mod decoration;
 
-use crate::ext::{Effect, LayoutWithOptions, Style};
+use crate::ext::{Effect, Row, Style};
 use crate::widgets::key_value_view::decoration::KeyValueViewDecoration;
 use crate::widgets::{CellAnchor, CellWidth, Lines, Table, TableColumn};
-use crate::{BoxedFormattedLayout, Dimension, Layout, LayoutOptions, RcLayout, WrapMode};
+use crate::{BoxedFormattedLayout, Layout, LayoutContext, MeasureMode, MeasurementSpecifics, Measurements, RcLayout, WrapMode};
 use std::any::Any;
 
 pub struct KeyValueView {
@@ -57,16 +57,15 @@ impl KeyValueView {
 }
 
 impl Layout for KeyValueView {
-    fn pref_dim(&self, max_width: usize, wrap_mode: WrapMode) -> Dimension {
-        self.to_table().pref_dim(max_width, wrap_mode)
+    fn measure(&self, mode: MeasureMode) -> Measurements {
+        self.to_table().measure(mode)
     }
 
-    fn min_dim(&self) -> Dimension {
-        self.to_table().min_dim()
-    }
-
-    fn layout_strict(&'_ self, options: LayoutOptions) -> BoxedFormattedLayout<'_> {
-        LayoutWithOptions::of(self.to_table().into(), options).into()
+    fn layout_with_context(&'_ self, context: LayoutContext) -> BoxedFormattedLayout<'_> {
+        match &context.measurements.specifics {
+            MeasurementSpecifics::Rows(_) => Row::layout(context).unwrap(),
+            _ => self.layout_strict(context.options),
+        }
     }
 
     fn as_any(&self) -> &dyn Any {
@@ -178,7 +177,8 @@ mod tests {
             concat!(
                 "┌────┬──────┐\n",
                 "│\u{1b}[1m\u{1b}[1m\u{1b}[38;5;33mKey\u{1b}[0m │\u{1b}[1m\u{1b}[1m\u{1b}[38;5;33mValue \u{1b}[0m│\n",
-                "├────┼──────┤\n│\u{1b}[1mkey1\u{1b}[0m│value1│\n",
+                "├────┼──────┤\n",
+                "│\u{1b}[1mkey1\u{1b}[0m│value1│\n",
                 "│\u{1b}[1mkey2\u{1b}[0m│   123│\n",
                 "│\u{1b}[1mkey3\u{1b}[0m│456.78│\n",
                 "│\u{1b}[1mkey4\u{1b}[0m│ [x]  │\n",

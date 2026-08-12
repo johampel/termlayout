@@ -1,9 +1,24 @@
-//! Example demonstrating how to author an own [`Layout`] widget.
+//! Example demonstrating how to implement a custom [`Layout`](termlayout::Layout) widget.
+//!
+//! This example defines `TwoColumns`, a reusable widget that renders its content side-by-side in
+//! two columns separated by a configurable spacer string. When the available width is too narrow
+//! for two columns, the widget falls back to a single-column display automatically.
+//!
+//! The implementation uses the [`Cell`](termlayout::widgets::Cell) widget to split the content
+//! and combines the resulting halves with a [`Horizontal`](termlayout::widgets::Horizontal) layout.
+//!
+//! You can run this example using:
+//! ```bash
+//! cargo run --example two_columns
+//! ```
 
 use std::any::Any;
-use termlayout::ext::{DisplayStr, LayoutWithOptions};
+use termlayout::ext::{DisplayStr, LayoutWithContext};
 use termlayout::widgets::{Cell, Filler, Horizontal, Lines};
-use termlayout::{BoxedFormattedLayout, Dimension, Layout, LayoutOptions, RcLayout, WrapMode};
+use termlayout::{
+    BoxedFormattedLayout, Dimension, Layout, LayoutContext, MeasureMode, Measurements, RcLayout,
+    WrapMode,
+};
 
 #[path = "shared/mod.rs"]
 mod shared;
@@ -45,47 +60,65 @@ impl TwoColumns {
     }
 }
 impl Layout for TwoColumns {
-    /// Calculates the preferred dimension.
-    /// The most important constraint is that the resulting dimension must never exceed the
-    /// `max_width` regarding the width of the returned dimension.
-    fn pref_dim(&self, max_width: usize, wrap_mode: WrapMode) -> Dimension {
-        // First check, whether we have sufficient space for two columns
-        if self.can_display_with_two_columns(max_width) {
-            // We have enough space for two columns. We determine the width of the columns
-            let col_width = (max_width - self.spacer.display_len()) / 2;
-            // We calculate the preferred dimension of the content based on the column width
-            let dim = self.content.pref_dim(col_width, wrap_mode);
-            // The total width is then the sum of the two columns and the spacer width.
-            // The height is half of the height of the content.
-            Dimension::new(
-                2 * col_width + self.spacer.display_len(),
-                dim.height.div_ceil(2),
-            )
-        } else {
-            // We reach this branch if we display only one column. In this case we just return
-            // the preferred dimension of the content.
-            self.content.pref_dim(max_width, wrap_mode)
+    /// Measures the dimensions of this layout based on the given mode.
+    fn measure(&self, mode: MeasureMode) -> Measurements {
+        match mode {
+            MeasureMode::Min => {
+                // Get the minimum dimension of the content.
+                // The minimum is two columns plus spacer at half the height.
+                let dim = self.content.measure(MeasureMode::Min).dim;
+                Dimension::new(
+                    2 * dim.width + self.spacer.display_len(),
+                    dim.height.div_ceil(2),
+                )
+                .into()
+            }
+            MeasureMode::PrefWidth {
+                max_width,
+                wrap_mode,
+            } => {
+                if self.can_display_with_two_columns(max_width) {
+                    let col_width = (max_width - self.spacer.display_len()) / 2;
+                    let dim = self
+                        .content
+                        .measure(MeasureMode::pref_width(col_width, wrap_mode))
+                        .dim;
+                    Dimension::new(
+                        2 * col_width + self.spacer.display_len(),
+                        dim.height.div_ceil(2),
+                    )
+                    .into()
+                } else {
+                    self.content.measure(mode)
+                }
+            }
+            MeasureMode::FixedWidth { width, wrap_mode } => {
+                if self.can_display_with_two_columns(width) {
+                    let col_width = (width - self.spacer.display_len()) / 2;
+                    let dim = self
+                        .content
+                        .measure(MeasureMode::fixed_width(col_width, wrap_mode))
+                        .dim;
+                    Dimension::new(width, dim.height.div_ceil(2)).into()
+                } else {
+                    self.content.measure(mode)
+                }
+            }
+            MeasureMode::Exact { dimension, .. } => dimension.into(),
         }
     }
 
-    /// Calculates the minimum dimension.
-    /// The minimum dimension should return the dimension with the minimum width so that we can
-    /// display the content without wrapping, truncation, and loss of information.
-    fn min_dim(&self) -> Dimension {
-        // Get the minimum dimension of the content
-        let dim = self.content.min_dim();
-        // so the minimum dimension should be the double width of the content plus the spacer and
-        // half the height of the content.
-        Dimension::new(
-            2 * dim.width + self.spacer.display_len(),
-            dim.height.div_ceil(2),
-        )
-    }
+    fn layout_with_context(&'_ self, context: LayoutContext) -> BoxedFormattedLayout<'_> {
+        let LayoutContext {
+            options,
+            measurements,
+        } = context;
 
-    fn layout_strict(&'_ self, options: LayoutOptions) -> BoxedFormattedLayout<'_> {
         // if there is not enough space for two columns, we just display the content in one column
         if !self.can_display_with_two_columns(options.dim.width) {
-            return self.content.layout_strict(options);
+            return self
+                .content
+                .layout_with_context(LayoutContext::new(options, measurements));
         }
 
         // Compute the dimension of the content. This is basically the half of the available width
@@ -101,12 +134,13 @@ impl Layout for TwoColumns {
             .with_dim(content_dim)
             .split_vertical(options.dim.height);
 
-        let horizontal = Horizontal::new(
+        let horizontal: RcLayout = Horizontal::new(
             vec![left, right],
             Some(Filler::vertical(&self.spacer).into()),
         )
         .into();
-        LayoutWithOptions::of(horizontal, options).into()
+        let measurements = horizontal.measure(MeasureMode::exact(options.dim, options.wrap_mode));
+        LayoutWithContext::of(horizontal, LayoutContext::new(options, measurements)).into()
     }
 
     fn as_any(&self) -> &dyn Any {

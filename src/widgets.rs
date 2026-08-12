@@ -27,13 +27,12 @@ pub(crate) mod key_value_view;
 
 pub use cell::Cell;
 pub use cell::CellAnchor;
-pub use cell::CellDimension;
-pub use cell::CellWidth;
+pub use cell::dimension::CellDimension;
+pub use cell::dimension::CellWidth;
 
 pub use filler::FillMode;
 pub use filler::Filler;
 pub use horizontal::Horizontal;
-pub use horizontal::row::Row;
 pub use lines::Lines;
 pub use lines::LinesAlignment;
 

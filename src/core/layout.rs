@@ -1,13 +1,13 @@
-use crate::{Dimension, LayoutOptions, WrapMode};
+use crate::{LayoutContext, LayoutOptions, MeasureMode, Measurements, WrapMode};
 use std::any::Any;
 use std::fmt::{Display, Error, Formatter, Write};
 use std::rc::Rc;
 
 /// Central trait that describes how to lay out textual content.
 ///
-/// The `Layout` trait provides two groups of methods:
-/// - Methods that calculate the [`Dimension`] of a `Layout`. These are typically called during the
-///   layout process to determine the measurements of the content.
+/// The `Layout` trait provides two method groups:
+/// - The [`measure`](Layout::measure) method that calculates the [`Measurements`] of a `Layout`.
+///   The `Measurements` give information about the sizing of the layout.
 /// - Methods that actually lay out the content. The most central one is
 ///   [`layout_strict`](Layout::layout_strict); all other `layout*` methods are convenience
 ///   wrappers that delegate to this one.
@@ -17,6 +17,7 @@ use std::rc::Rc;
 /// the `Layout` itself has no information about the dimensions of the output area. When it comes
 /// to the actual layout process, the `layout_strict` is called, which expects a [`LayoutOptions`]
 /// that describes the output area and other aspects of the layout.
+///
 ///
 /// The `layout_strict` returns a [`FormattedLayout`] (more exactly a [`BoxedFormattedLayout`],
 /// which is just a boxed `FormattedLayout`) that contains intermediate data from the `Layout` and
@@ -49,7 +50,8 @@ use std::rc::Rc;
 ///                     +--------------+
 ///
 /// ```
-///
+/// Note that the picture above represents a simplified view - internally the overall picture is a
+/// little bit more complex, since `layout_strict` calls `measure`.
 /// # Examples
 /// The following example shows a typical usage:
 /// ```rust
@@ -65,93 +67,66 @@ use std::rc::Rc;
 ///     ));
 /// ```
 pub trait Layout {
-    /// Calculates the preferred [`Dimension`] of this layout.
-    /// The resulting `Dimension` must not exceed `max_width`; it represents the `Dimension`
-    /// if this layout was laid out with the given `max_width` and `wrap_mode`.
+    /// Computes the [`Measurements`] of this instance based on the given `mode`.
+    /// The [`Measurements`] contains at least the overall dimension of the `Layout`, but it might
+    /// contain also information about nested objects.
     ///
     /// # Parameters
-    /// - `max_width`: The maximum width the result `Dimension` has. The concrete width
-    ///   might be less or equal; but never larger
-    /// - `wrap_mode`: The [`WrapMode`] to apply when lay out.
+    /// - `mode`: The [`MeasureMode`] describing how to measure the size of the layout
     ///
     /// # Returns
-    /// The preferred `Dimension`
+    /// The [`Measurements`]
     ///
     /// # Examples
-    /// ```rust
-    /// use termlayout::*;
-    /// use termlayout::widgets::Paragraph;
-    ///
-    /// let layout = Paragraph::left("This is some sample text");
-    ///
-    /// let dimension = layout.pref_dim(100000, WrapMode::Wrap);
-    /// assert_eq!(dimension, Dimension::new(24, 1));
-    ///
-    /// let dimension = layout.pref_dim(13, WrapMode::Wrap);
-    /// assert_eq!(dimension, Dimension::new(12, 2));
-    ///
-    /// let dimension = layout.pref_dim(13, WrapMode::default_truncate());
-    /// assert_eq!(dimension, Dimension::new(12, 2));
-    ///
-    /// let dimension = layout.pref_dim(4, WrapMode::Wrap);
-    /// assert_eq!(dimension, Dimension::new(4, 6));
-    ///
-    /// let dimension = layout.pref_dim(4, WrapMode::default_truncate());
-    /// assert_eq!(dimension, Dimension::new(4, 5));
-    /// ```
-    fn pref_dim(&self, max_width: usize, wrap_mode: WrapMode) -> Dimension;
-
-    /// Calculates the [`Dimension`] of this layout based on the given `max_width`.
-    /// The result is similar to [`pref_dim()`](Layout::pref_dim), but returns a dimension with
-    /// exactly the given `max_width`.
-    ///
-    /// # Parameters
-    /// - `max_width` - The maximum width the result `Dimension` has. The concrete width
-    ///   might be less or equal; but never larger
-    /// - `wrap_mode` - The [`WrapMode`] to apply when lay out.
-    ///
-    /// # Returns
-    /// The preferred `Dimension`
-    ///
-    /// # Examples
-    /// ```rust
-    /// use termlayout::*;
-    /// use termlayout::widgets::Paragraph;
-    ///
-    /// let layout = Paragraph::left("This is some sample text");
-    ///
-    /// let dimension = layout.pref_dim_fixed_width(100000, WrapMode::Wrap);
-    /// assert_eq!(dimension, Dimension::new(100000, 1));
-    ///
-    /// let dimension = layout.pref_dim_fixed_width(13, WrapMode::Wrap);
-    /// assert_eq!(dimension, Dimension::new(13, 2));
-    /// ```
-    fn pref_dim_fixed_width(&self, max_width: usize, wrap_mode: WrapMode) -> Dimension {
-        let dim = self.pref_dim(max_width, wrap_mode);
-        Dimension::new(max_width, dim.height)
-    }
-
-    /// Returns the [`Dimension`] with the minimal width that can be used to display this
-    /// `Layout` without wrapping, truncation, and loss of information.
-    ///
-    /// For example, for a paragraph this would be a dimension with a width of the longest word
-    /// and an according height.
-    ///
-    /// # Returns
-    /// The minimal `Dimension` in terms of the width.
-    ///
-    /// # Examples
+    /// - Compute the minimum size of the layout:
     /// ```rust
     /// use termlayout::*;
     /// use termlayout::widgets::Paragraph;
     ///
     /// let layout = Paragraph::left("This is a small test");
     ///
-    /// let dimension = layout.min_dim();
+    /// let measurements = layout.measure(MeasureMode::Min);
     ///
-    /// assert_eq!(dimension, Dimension::new(5, 4));
-    ///```
-    fn min_dim(&self) -> Dimension;
+    /// assert_eq!(measurements.dim, Dimension::new(5,4));
+    /// ```
+    /// - Compute the preferred width of the layout (different starting widths, returning a
+    ///   maybe smaller width):
+    /// ```rust
+    /// use termlayout::*;
+    /// use termlayout::widgets::Paragraph;
+    ///
+    /// let layout = Paragraph::left("This is some sample text");
+    ///
+    /// let measurements = layout.measure(MeasureMode::pref_width(1000000, WrapMode::Wrap));
+    /// assert_eq!(measurements.dim, Dimension::new(24, 1));
+    ///
+    /// let measurements = layout.measure(MeasureMode::pref_width(13, WrapMode::Wrap));
+    /// assert_eq!(measurements.dim, Dimension::new(12, 2));
+    ///
+    /// let measurements = layout.measure(MeasureMode::pref_width(4, WrapMode::Wrap));
+    /// assert_eq!(measurements.dim, Dimension::new(4, 6));
+    ///
+    /// let measurements = layout.measure(MeasureMode::pref_width(13, WrapMode::default_truncate()));
+    /// assert_eq!(measurements.dim, Dimension::new(12, 2));
+    ///
+    /// let measurements = layout.measure(MeasureMode::pref_width(4, WrapMode::default_truncate()));
+    /// assert_eq!(measurements.dim, Dimension::new(4, 5));
+    /// ```
+    /// - Compute the fixed preferred width of the layout (different starting widths, returning the
+    ///   width):
+    /// ```rust
+    /// use termlayout::*;
+    /// use termlayout::widgets::Paragraph;
+    ///
+    /// let layout = Paragraph::left("This is some sample text");
+    ///
+    /// let measurements = layout.measure(MeasureMode::fixed_width(1000000, WrapMode::Wrap));
+    /// assert_eq!(measurements.dim, Dimension::new(1000000, 1));
+    ///
+    /// let measurements = layout.measure(MeasureMode::fixed_width(13, WrapMode::Wrap));
+    /// assert_eq!(measurements.dim, Dimension::new(13, 2));
+    /// ```
+    fn measure(&self, mode: MeasureMode) -> Measurements;
 
     /// Generates a [`FormattedLayout`] so that the content does not exceed `max_width` columns
     /// and is wrapped if required.
@@ -210,8 +185,9 @@ pub trait Layout {
         max_width: usize,
         wrap_mode: WrapMode,
     ) -> BoxedFormattedLayout<'_> {
-        let dim = self.pref_dim(max_width, wrap_mode);
-        self.layout_strict(LayoutOptions::new(dim, false, wrap_mode, None))
+        let measurements = self.measure(MeasureMode::pref_width(max_width, wrap_mode));
+        let options = LayoutOptions::new(measurements.dim, false, wrap_mode, None);
+        self.layout_with_context(LayoutContext::new(options, measurements))
     }
 
     /// Creates a [`FormattedLayout`] that strictly follows the provided [`LayoutOptions`].
@@ -245,7 +221,27 @@ pub trait Layout {
     ///         "                      \n"
     ///     ));
     /// ```
-    fn layout_strict(&'_ self, options: LayoutOptions) -> BoxedFormattedLayout<'_>;
+    fn layout_strict(&'_ self, options: LayoutOptions) -> BoxedFormattedLayout<'_> {
+        let measurements = self.measure(MeasureMode::exact(options.dim, options.wrap_mode));
+        let context = LayoutContext::new(options, measurements);
+        self.layout_with_context(context)
+    }
+
+    /// Creates a [`FormattedLayout`] using th given `context`.
+    /// Normally, this method is not called directly, since the caller had to ensure that the
+    /// `context` is set up correctly. Instead, clients usually call [`layout`](Layout::layout)
+    /// or  [`layout_strict`](Layout::layout_strict)
+    ///
+    /// The returned `FormattedLayout` is bound to the lifetime of this instance and typically
+    /// contains intermediate/precomputed data based on this instance and the supplied options.
+    ///
+    /// # Parameters
+    /// - `context`: The [`LayoutContext`] to use for formatting.
+    ///
+    /// # Returns
+    /// A `BoxedFormattedLayout` that represents the formatted layout.
+    ///
+    fn layout_with_context(&'_ self, context: LayoutContext) -> BoxedFormattedLayout<'_>;
 
     /// Returns `self` as a `&dyn Any`, allowing for runtime type introspection.
     ///
@@ -396,7 +392,7 @@ pub trait LayoutWriter<'wrt> {
     /// In detail, the following things should be done:
     /// * It should write all data for the current row to the `Write`;
     ///   always *without* any new line and *never* more characters than defined in the
-    ///   [width](Dimension::width) of the associated [`LayoutOptions`] dimension.
+    ///   `width` of the associated [`LayoutOptions`] dimension.
     /// * If the actual output is smaller than the width but [`fill_rows`](LayoutOptions::fill_rows)
     ///   is set to `true`, the rest of the available width must be filled with spaces.
     ///
@@ -422,7 +418,7 @@ pub type SizedLayoutResult = Result<usize, Error>;
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::Rect;
+    use crate::{Dimension, Rect};
 
     struct MockLayoutWriter<'a> {
         options: &'a LayoutOptions,
