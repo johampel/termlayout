@@ -9,7 +9,7 @@ use std::fmt::Write;
 
 /// A widget that displays text with word wrapping and alignment.
 ///
-/// The content is represented as a string (which may contain ANSI control sequences for
+/// The content is represented as a string (which may contain ANSI SGR control sequences for
 /// terminal styling). The text is split into words and each line is filled with as many
 /// words as possible. The widget supports left, center, right, and block alignment.
 ///

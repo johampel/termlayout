@@ -13,6 +13,7 @@ use termlayout::widgets::{
 };
 use termlayout::{Layout, RcLayout, WrapMode};
 
+#[allow(clippy::too_many_lines)]
 fn main() {
     // 1. Build a styled Header using TextBuilder
     let mut header_builder = TextBuilder::new();

@@ -780,7 +780,7 @@ impl TextBuilder {
     }
 
     /// Returns true if the buffer is semantically empty.
-    /// It is empty if it contains at least one display character (so no control sequences).
+    /// It is empty if it contains no display characters (only ANSI SGR sequences or nothing).
     ///
     /// # Returns
     /// `true` if the buffer is empty, `false` otherwise.

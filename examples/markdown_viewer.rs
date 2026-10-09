@@ -34,9 +34,10 @@ fn show_example() {
     match fs::read_to_string(filename.as_str()) {
         Ok(content) => {
             // Create the markdown widget with the content and the appropriate configuration.
-            let config = match *DARK_STYLE.lock().unwrap() {
-                true => &MarkdownConfig::dark(),
-                false => &MarkdownConfig::light(),
+            let config = if *DARK_STYLE.lock().unwrap() {
+                &MarkdownConfig::dark()
+            } else {
+                &MarkdownConfig::light()
             };
             let markdown = Markdown::with_config(content, config);
 
@@ -61,7 +62,7 @@ fn select_file() -> MenuItem {
         format!("Select file to show (current: {filename})"),
         || {
             let filename = Menu::prompt("Enter file name");
-            *FILENAME.lock().unwrap() = filename.to_string().into();
+            *FILENAME.lock().unwrap() = filename.clone().into();
             true
         },
     )
@@ -70,16 +71,13 @@ fn select_file() -> MenuItem {
 /// Returns a [`MenuItem`] that allows the user to toggle between light and dark style.
 fn toggle_style() -> MenuItem {
     let style = *DARK_STYLE.lock().unwrap();
-    let style_name = match style {
-        true => String::from("dark"),
-        false => String::from("light"),
-    };
+    let style_name = if style { "dark" } else { "light" };
     MenuItem::new(
         's',
         format!("Toggle between light and dark style (current: {style_name})"),
         || {
             let style = *DARK_STYLE.lock().unwrap();
-            *DARK_STYLE.lock().unwrap() = (!style).into();
+            *DARK_STYLE.lock().unwrap() = !style;
             true
         },
     )

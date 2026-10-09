@@ -10,7 +10,7 @@ use std::fmt::Write;
 
 /// A widget that displays text line-by-line with horizontal alignment.
 ///
-/// The content is represented as a string (which may contain ANSI control sequences for
+/// The content is represented as a string (which may contain ANSI SGR control sequences for
 /// terminal styling). Each newline character (`\n`) is treated as a line break.
 /// The widget supports left, center, and right alignment.
 ///
@@ -549,7 +549,7 @@ mod tests {
             WrapMode::default(),
         ));
         assert_eq!(measurements.dim, Dimension::new(10, 5));
-        assert_eq!(measurements.specifics.is_none(), true);
+        assert!(measurements.specifics.is_none());
     }
 
     #[test]
@@ -557,7 +557,7 @@ mod tests {
         let lines = Lines::left("abc def\nghi\njklm");
         let measurements = lines.measure(MeasureMode::min());
         assert_eq!(measurements.dim, Dimension::new(7, 3));
-        assert_eq!(measurements.specifics.is_none(), true);
+        assert!(measurements.specifics.is_none());
     }
 
     #[test]
