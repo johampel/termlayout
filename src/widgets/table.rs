@@ -550,6 +550,35 @@ mod tests {
         assert_eq!(format!("{}", table.layout(0)), "");
     }
 
+    #[test]
+    fn table_layout_without_data_rows() {
+        let table = Table::new(
+            TableDecoration::boxed_grid(),
+            vec![
+                TableColumn::default()
+                    .with_header(Lines::left("Name"))
+                    .with_width(CellWidth::Minimal),
+            ],
+            vec![],
+        );
+
+        assert_eq!(
+            format!("{}", table.layout(40)),
+            "┌────┐\n│Name│\n├────┤\n└────┘\n"
+        );
+    }
+
+    #[test]
+    fn headless_table_layout_without_data_rows() {
+        let table = Table::new(
+            TableDecoration::headless_no_grid(),
+            vec![TableColumn::default().with_width(CellWidth::Minimal)],
+            vec![],
+        );
+
+        assert_eq!(format!("{}", table.layout(40)), "");
+    }
+
     // -- Fill column width distribution tests -------------------------------------------------------
 
     /// A single Fill column takes all space left after fixed-width and decoration columns.
