@@ -308,20 +308,31 @@ impl<'a> DecoratedTable<'a> {
             table.columns.len(),
             table.cells.iter().map(Vec::len).max().unwrap_or(0),
         );
-        let deco_count = table.decoration.rows.len();
         let row_sep = table
             .decoration
             .rows
             .contains_key(&DecorationRowType::RowSep);
-        let rows = if table_rows > 0 {
-            if row_sep {
-                2 * table_rows + deco_count - 3
-            } else {
-                table_rows + deco_count - 1
-            }
-        } else {
-            deco_count - usize::from(row_sep)
-        };
+        let rows = usize::from(table.decoration.rows.contains_key(&DecorationRowType::Top))
+            + usize::from(
+                table
+                    .decoration
+                    .rows
+                    .contains_key(&DecorationRowType::HeaderRow),
+            )
+            + usize::from(
+                table
+                    .decoration
+                    .rows
+                    .contains_key(&DecorationRowType::HeaderSep),
+            )
+            + table_rows
+            + table_rows.saturating_sub(1) * usize::from(row_sep)
+            + usize::from(
+                table
+                    .decoration
+                    .rows
+                    .contains_key(&DecorationRowType::Bottom),
+            );
         let cols = if table_cols > 0 && table.decoration.has_sep {
             2 * table_cols - 1
         } else {

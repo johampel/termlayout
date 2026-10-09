@@ -174,8 +174,11 @@ impl<'a> TableMetrics<'a> {
             _ => {
                 let mut width = 0;
                 for row in 0..self.table.rows {
+                    let Some(content) = self.table.cell_at(row, col) else {
+                        continue;
+                    };
                     let cell = Cell::new(
-                        self.table.cell_at(row, col).unwrap(),
+                        content,
                         CellDimension::Declarative(CellWidth::Minimal),
                         None, //  WrapMode - plays no role in case of minimal
                         None,
@@ -197,8 +200,11 @@ impl<'a> TableMetrics<'a> {
             let mut height = 0;
             for col in 0..self.table.cols {
                 let table_column = self.table.table_column_at(col).unwrap();
+                let Some(content) = self.table.cell_at(row, col) else {
+                    continue;
+                };
                 let cell = Cell::new(
-                    self.table.cell_at(row, col).unwrap(),
+                    content,
                     CellDimension::Declarative(table_column.width),
                     Some(table_column.wrap_mode),
                     None,
