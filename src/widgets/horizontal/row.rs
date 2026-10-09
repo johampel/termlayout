@@ -371,7 +371,7 @@ mod tests {
                 "         UVWXY\n",
                 "\n"
             )
-        )
+        );
     }
 
     #[test]
@@ -393,7 +393,7 @@ mod tests {
                 "         UVWXY      \n",
                 "                    \n"
             )
-        )
+        );
     }
 
     #[test]
@@ -413,7 +413,7 @@ mod tests {
         assert_eq!(
             format!("{formatted}"),
             concat!("ijkl123F\n", "opqr456K\n", "uvwx789P\n",)
-        )
+        );
     }
 
     #[test]
@@ -439,6 +439,6 @@ mod tests {
                 "       UVWXY   \n",
                 "               \n"
             )
-        )
+        );
     }
 }

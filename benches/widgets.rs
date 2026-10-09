@@ -1,3 +1,5 @@
+#![allow(missing_docs)] // Criterion generates public benchmark functions without doc attributes.
+
 use criterion::{BenchmarkId, Criterion, black_box, criterion_group, criterion_main};
 use termlayout::widgets::{
     Cell, CellWidth, Filler, Frame, FrameDecoration, Horizontal, Lines, List, Menu, MenuItem,

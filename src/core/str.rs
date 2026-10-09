@@ -1,12 +1,12 @@
 use std::fmt::{Display, Formatter, Write};
 use std::ops::{Bound, RangeBounds};
 
-/// A trait providing methods for string operations that respect terminal control sequences.
+/// A trait providing methods for string operations that respect ANSI SGR control sequences.
 /// This trait is implemented for `str` and provides methods for calculating display length,
-/// slicing, and splitting text while ignoring ANSI escape sequences.
+/// slicing, and splitting text while ignoring ANSI SGR escape sequences.
 pub trait DisplayStr: AsRef<str> {
     /// Returns an [`Iterator`] for [`Fragment`]s.
-    /// `self` is seen as a sequence of plain text and control sequences. This iterator returns
+    /// `self` is seen as a sequence of plain text and ANSI SGR control sequences. This iterator returns
     /// them as a sequence of [`Fragment`]s.
     ///
     /// # Example
@@ -74,7 +74,7 @@ pub trait DisplayStr: AsRef<str> {
     }
 
     /// Returns an [`Iterator`] for [`Fragment`]s and their byte index.
-    /// `self` is seen as a sequence of plain text and control sequences. This iterator returns
+    /// `self` is seen as a sequence of plain text and ANSI SGR control sequences. This iterator returns
     /// them as [`Fragment`]s.
     ///
     /// # Returns
@@ -99,7 +99,7 @@ pub trait DisplayStr: AsRef<str> {
     }
 
     /// Calculates the display length of the text - measured in terminal columns - excluding control
-    /// sequences.
+    /// SGR sequences.
     ///
     /// # Example
     /// ```rust
@@ -146,7 +146,7 @@ pub trait DisplayStr: AsRef<str> {
     }
 
     /// Returns a slice according to its display index range (measured in terminal columns).
-    /// A display index counts terminal columns that are not part of control sequences.
+    /// A display index counts terminal columns that are not part of ANSI SGR control sequences.
     ///
     /// # Parameters
     /// - `range`: The range of display indices to extract the slice for.
@@ -190,14 +190,14 @@ pub trait DisplayStr: AsRef<str> {
     }
 
     /// Converts a display index (terminal columns) to a byte index.
-    /// A display index counts terminal columns that are not part of control sequences.
+    /// A display index counts terminal columns that are not part of ANSI SGR control sequences.
     ///
     /// # Parameters
     /// - `display_index`: The display index to convert.
     /// - `as_start`: Whether to convert the display index as a start index. This influences how
-    ///   to deal with control sequences if the display index points to the beginning of a
-    ///   control sequence. If `true`, the returned byte index points to the start of the control
-    ///   sequence. If `false`, the returned byte index points to the end of the control sequence.
+    ///   to deal with ANSI SGR control sequences if the display index points to the beginning of
+    ///   one. If `true`, the returned byte index points to the start of the sequence. If `false`,
+    ///   the returned byte index points to its end.
     ///
     /// # Returns
     /// The byte index corresponding to the display index.
@@ -273,7 +273,7 @@ impl DisplayStr for str {}
 
 /// Internal iterator for splitting text into fragments.
 ///
-/// This iterator processes text and separates plain text from ANSI control sequences.
+/// This iterator processes text and separates plain text from ANSI SGR control sequences.
 pub(crate) struct FragmentIter<'text> {
     /// The remaining text to process
     rest: &'text str,

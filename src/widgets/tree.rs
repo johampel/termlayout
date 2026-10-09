@@ -95,6 +95,17 @@ impl Tree {
         }
     }
 
+    fn traverse_visible<T>(&self, mut callback: T) -> bool
+    where
+        T: FnMut(&TreePath) -> bool,
+    {
+        if self.show_root {
+            self.root.traverse(true, callback)
+        } else {
+            self.root.traverse_children_as_roots(&mut callback)
+        }
+    }
+
     fn layout_node(
         &self,
         path: &TreePath,
@@ -140,7 +151,7 @@ impl Layout for Tree {
         let mut height = mode.height();
         let mut dim = Dimension::empty();
         let mut children = vec![];
-        self.root.traverse(self.show_root, |path| {
+        self.traverse_visible(|path| {
             if height != Some(0) {
                 let item_width = max(1, max_width.saturating_sub(prefix_len * path.depth));
                 let prefix_width = max_width - item_width;
@@ -183,7 +194,7 @@ impl Layout for Tree {
                 let mut y = 0;
                 let mut index = 0;
                 let mut children = Vec::new();
-                let ok = self.root.traverse(self.show_root, |path| {
+                let ok = self.traverse_visible(|path| {
                     if index >= item_measurements.len() {
                         return true;
                     }
@@ -297,6 +308,20 @@ impl TreeNode {
             return false;
         }
         path.traverse_children(&mut callback)
+    }
+
+    fn traverse_children_as_roots<T>(&self, callback: &mut T) -> bool
+    where
+        T: FnMut(&TreePath) -> bool,
+    {
+        let len = self.children.len();
+        for (index, child) in self.children.iter().enumerate() {
+            let child = TreePath::new(child, index + 1 == len, None);
+            if !callback(&child) || !child.traverse_children(callback) {
+                return false;
+            }
+        }
+        true
     }
 }
 
@@ -515,5 +540,37 @@ mod tests {
         let tree = Tree::new(TreeDecoration::lines(1), sample_nodes(), true);
 
         assert_eq!(format!("{}", tree.layout(0)), "");
+    }
+
+    #[test]
+    fn tree_layout_without_root_renders_a_forest() {
+        let roots = vec![
+            TreeNode::new(
+                Lines::left("base"),
+                vec![TreeNode::leaf(Lines::left("dev"))],
+            ),
+            TreeNode::leaf(Lines::left("lonely")),
+        ];
+        let tree = Tree::new(
+            TreeDecoration::default(),
+            TreeNode::new(Lines::left("hidden"), roots),
+            false,
+        );
+
+        assert_eq!(format!("{}", tree.layout(40)), "base\n└─ dev\nlonely\n");
+    }
+
+    #[test]
+    fn tree_layout_without_root_does_not_reduce_available_width() {
+        let tree = Tree::new(
+            TreeDecoration::default(),
+            TreeNode::new(
+                Lines::left("hidden"),
+                vec![TreeNode::leaf(Lines::left("four"))],
+            ),
+            false,
+        );
+
+        assert_eq!(format!("{}", tree.layout(4)), "four\n");
     }
 }

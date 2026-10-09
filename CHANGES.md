@@ -1,3 +1,9 @@
+# Version 0.2.1
+
+- https://github.com/johampel/termlayout/issues/3: Fixed a panic when laying out tables with columns but no data rows.
+- https://github.com/johampel/termlayout/issues/2: Fixed hidden tree roots so their children render as an unindented forest with the full available width.
+- Housekeeping: Clarified ANSI SGR support in the documentation and made the complete workspace pass strict Clippy checks.
+
 # Version 0.2.0
 
 - **Breaking**: Reimplementation of the sizing system: instead of providing `pref_dim` and `min_dim` to determine the size of the 

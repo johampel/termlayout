@@ -11,7 +11,7 @@ A declarative terminal layout library for Rust.
 ## Why termlayout?
 
 - **Declarative & Composable**: Build complex layouts by composing simple widgets
-- **ANSI-Aware**: Proper handling of ANSI escape sequences for colors and styles
+- **ANSI-SGR-Aware**: Proper handling of ANSI SGR escape sequences for colors and styles
 - **Flexible Layout Engine**: Automatic dimension calculation, word wrapping, and clipping
 - **Rich Widget Library**: Tables, paragraphs, columns, fillers, and more
 - **Extensible**: Easy to create custom widgets using the `Layout` trait
@@ -23,7 +23,7 @@ Add `termlayout` to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-termlayout = "0.2.0"
+termlayout = "0.2.1"
 ```
 
 Or use `cargo add`:
@@ -40,7 +40,7 @@ To enable the `markdown` feature, add it to your dependencies:
 
 ```toml
 [dependencies]
-termlayout = { version = "0.2.0", features = ["markdown"] }
+termlayout = { version = "0.2.1", features = ["markdown"] }
 ```
 
 ## Features

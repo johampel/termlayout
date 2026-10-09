@@ -583,7 +583,7 @@ mod tests {
 
     /// A single Fill column takes all space left after fixed-width and decoration columns.
     ///
-    /// Layout (headless_no_grid, 1-char separator, `fill_rows=true`):
+    /// Layout (`headless_no_grid`, 1-char separator, `fill_rows=true`):
     /// ```text
     /// abc x     ← col0(Minimal)=3, sep=1, col1(Fill)=6  →  total 10
     /// ```
@@ -609,7 +609,7 @@ mod tests {
 
     /// Two Fill columns split the remaining space evenly.
     ///
-    /// Layout (headless_no_grid, 1-char separator, total width 11, `fill_rows=true`):
+    /// Layout (`headless_no_grid`, 1-char separator, total width 11, `fill_rows=true`):
     /// ```text
     /// A     B    ← col0(Fill)=5, sep=1, col1(Fill)=5  →  total 11
     /// ```
@@ -633,7 +633,7 @@ mod tests {
 
     /// When the remaining space cannot be split evenly, the last Fill column gets the extra char.
     ///
-    /// Layout (headless_no_grid, 1-char separator, total width 12, `fill_rows=true`):
+    /// Layout (`headless_no_grid`, 1-char separator, total width 12, `fill_rows=true`):
     /// ```text
     /// A     B     ← col0(Fill)=5, sep=1, col1(Fill)=6  →  total 12
     /// ```
@@ -658,7 +658,7 @@ mod tests {
     /// Three Fill columns distribute remaining space using the iterative halving algorithm:
     /// first column gets the floor share; the remainder propagates to the next columns.
     ///
-    /// Layout (headless_no_grid, 2 separators, total width 32, `fill_rows=true`):
+    /// Layout (`headless_no_grid`, 2 separators, total width 32, `fill_rows=true`):
     /// ```text
     /// A         B         C          ← each col=10, 2 seps  →  total 32
     /// ```
@@ -700,7 +700,7 @@ mod tests {
         // The subsequent update fill_width = 0 - 1 previously caused an underflow panic.
         let table = headless_table(
             vec![CellWidth::Minimal, CellWidth::Fill],
-            vec![Lines::left(&"a".repeat(30)).into(), Lines::left("x").into()],
+            vec![Lines::left("a".repeat(30)).into(), Lines::left("x").into()],
         );
         // Must not panic. The Fill column is assigned the minimum width of 1.
         let dim = table
@@ -727,7 +727,7 @@ mod tests {
 
     /// A Proportional column receives the given fraction of the total available width.
     ///
-    /// Layout (headless_no_grid, available width 20):
+    /// Layout (`headless_no_grid`, available width 20):
     /// - col0 = Proportional(0.5) → 10 chars
     /// - sep = 1 char
     /// - col1 = Minimal("abc") → 3 chars

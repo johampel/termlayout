@@ -10,7 +10,7 @@ use std::ops::Range;
 /// `BaseLayoutWriter` handles core responsibilities such as:
 /// - Tracking the current cursor position (row and column)
 /// - Managing [`LayoutOptions`] and clipping rectangles
-/// - Handling style transitions and ANSI escape sequences
+/// - Handling style transitions and ANSI SGR escape sequences
 /// - Providing helper methods for writing strings and spaces with wrapping/truncation support
 ///
 /// Many custom `LayoutWriter` implementations use `BaseLayoutWriter` as a foundation

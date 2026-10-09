@@ -5,7 +5,7 @@ use std::str::Split;
 /// Represents a terminal style with colors and text effects.
 ///
 /// The different aspects of the style (effects and colors) are encoded as bits in this integer value.
-/// It implements the `Display` trait to format the style as an ANSI terminal control sequence.
+/// It implements the `Display` trait to format the style as an ANSI SGR control sequence.
 ///
 /// # Example
 /// ```rust
